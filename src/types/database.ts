@@ -12,31 +12,37 @@ export type Database = {
       organizations: {
         Row: {
           id: string
+          clerk_org_id: string
           name: string
-          domain: string
-          slug: string
+          subdomain: string
+          domain: string | null
           logo_url: string | null
           settings: Json
+          is_active: boolean
           created_at: string
           updated_at: string
         }
         Insert: {
           id?: string
+          clerk_org_id: string
           name: string
-          domain: string
-          slug: string
+          subdomain: string
+          domain?: string | null
           logo_url?: string | null
           settings?: Json
+          is_active?: boolean
           created_at?: string
           updated_at?: string
         }
         Update: {
           id?: string
+          clerk_org_id?: string
           name?: string
-          domain?: string
-          slug?: string
+          subdomain?: string
+          domain?: string | null
           logo_url?: string | null
           settings?: Json
+          is_active?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -46,11 +52,9 @@ export type Database = {
           id: string
           clerk_user_id: string
           email: string
-          first_name: string
-          last_name: string
+          first_name: string | null
+          last_name: string | null
           avatar_url: string | null
-          organization_id: string
-          role: 'admin' | 'manager' | 'member'
           is_active: boolean
           last_sign_in_at: string | null
           created_at: string
@@ -60,11 +64,9 @@ export type Database = {
           id?: string
           clerk_user_id: string
           email: string
-          first_name: string
-          last_name: string
+          first_name?: string | null
+          last_name?: string | null
           avatar_url?: string | null
-          organization_id: string
-          role?: 'admin' | 'manager' | 'member'
           is_active?: boolean
           last_sign_in_at?: string | null
           created_at?: string
@@ -74,15 +76,39 @@ export type Database = {
           id?: string
           clerk_user_id?: string
           email?: string
-          first_name?: string
-          last_name?: string
+          first_name?: string | null
+          last_name?: string | null
           avatar_url?: string | null
-          organization_id?: string
-          role?: 'admin' | 'manager' | 'member'
           is_active?: boolean
           last_sign_in_at?: string | null
           created_at?: string
           updated_at?: string
+        }
+      }
+      organization_memberships: {
+        Row: {
+          id: string
+          user_id: string
+          organization_id: string
+          role: 'admin' | 'manager' | 'member'
+          is_active: boolean
+          joined_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          organization_id: string
+          role?: 'admin' | 'manager' | 'member'
+          is_active?: boolean
+          joined_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          organization_id?: string
+          role?: 'admin' | 'manager' | 'member'
+          is_active?: boolean
+          joined_at?: string
         }
       }
       products: {
@@ -92,9 +118,10 @@ export type Database = {
           name: string
           description: string | null
           price: number
-          sku: string
+          sku: string | null
           stock_quantity: number
           is_active: boolean
+          created_by: string | null
           created_at: string
           updated_at: string
         }
@@ -104,9 +131,10 @@ export type Database = {
           name: string
           description?: string | null
           price: number
-          sku: string
+          sku?: string | null
           stock_quantity?: number
           is_active?: boolean
+          created_by?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -116,9 +144,10 @@ export type Database = {
           name?: string
           description?: string | null
           price?: number
-          sku?: string
+          sku?: string | null
           stock_quantity?: number
           is_active?: boolean
+          created_by?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -127,27 +156,33 @@ export type Database = {
         Row: {
           id: string
           organization_id: string
-          user_id: string
+          customer_name: string
+          customer_email: string
           total_amount: number
-          status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
+          status: 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled'
+          created_by: string | null
           created_at: string
           updated_at: string
         }
         Insert: {
           id?: string
           organization_id: string
-          user_id: string
+          customer_name: string
+          customer_email: string
           total_amount: number
-          status?: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
+          status?: 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled'
+          created_by?: string | null
           created_at?: string
           updated_at?: string
         }
         Update: {
           id?: string
           organization_id?: string
-          user_id?: string
+          customer_name?: string
+          customer_email?: string
           total_amount?: number
-          status?: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
+          status?: 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled'
+          created_by?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -187,7 +222,7 @@ export type Database = {
     }
     Enums: {
       user_role: 'admin' | 'manager' | 'member'
-      order_status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
+      order_status: 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled'
     }
     CompositeTypes: {
       [_ in never]: never

@@ -6,6 +6,26 @@ export interface SyncUserOptions {
   eventType: 'user.created' | 'user.updated' | 'user.deleted'
 }
 
+export interface SyncOrganizationOptions {
+  organization: {
+    id: string
+    name: string
+    slug?: string
+    imageUrl?: string
+    metadata?: Record<string, unknown>
+  }
+  eventType: 'organization.created' | 'organization.updated' | 'organization.deleted'
+}
+
+export interface SyncMembershipOptions {
+  membership: {
+    userId: string
+    organizationId: string
+    role: string
+  }
+  eventType: 'organizationMembership.created' | 'organizationMembership.updated' | 'organizationMembership.deleted'
+}
+
 export async function syncUserToSupabase({ user, eventType }: SyncUserOptions) {
   const supabase = createSupabaseAdminClient()
 
@@ -21,47 +41,19 @@ export async function syncUserToSupabase({ user, eventType }: SyncUserOptions) {
       return { success: true }
     }
 
-    // Extract email domain for organization assignment
+    // Extract email for user creation
     const email = user.emailAddresses[0]?.emailAddress
     if (!email) {
       throw new Error('User has no email address')
     }
 
-    const emailDomain = email.split('@')[1]
-
-    // Check if organization exists for this domain
-    let { data: organization } = await supabase
-      .from('organizations')
-      .select('id')
-      .eq('domain', emailDomain)
-      .single()
-
-    // Create organization if it doesn't exist
-    if (!organization) {
-      const { data: newOrg, error: createOrgError } = await supabase
-        .from('organizations')
-        .insert({
-          name: `${emailDomain} Organization`,
-          domain: emailDomain,
-          slug: emailDomain.replace('.', '-'),
-          settings: {}
-        })
-        .select('id')
-        .single()
-
-      if (createOrgError) throw createOrgError
-      organization = newOrg
-    }
-
-    // Prepare user data
+    // Prepare user data (no organization assignment here - handled by membership sync)
     const userData = {
       clerk_user_id: user.id,
       email: email,
-      first_name: user.firstName || '',
-      last_name: user.lastName || '',
-      avatar_url: user.imageUrl || '',
-      organization_id: organization.id,
-      role: 'member' as const, // Default role, can be changed by admin
+      first_name: user.firstName || null,
+      last_name: user.lastName || null,
+      avatar_url: user.imageUrl || null,
       is_active: true,
       last_sign_in_at: new Date().toISOString()
     }
@@ -82,14 +74,138 @@ export async function syncUserToSupabase({ user, eventType }: SyncUserOptions) {
       if (error) throw error
     }
 
-    return { success: true, organizationId: organization.id }
+    return { success: true }
   } catch (error) {
     console.error('Error syncing user to Supabase:', error)
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
   }
 }
 
-export async function getCurrentUser(clerkUserId: string) {
+export async function syncOrganizationToSupabase({ organization, eventType }: SyncOrganizationOptions) {
+  const supabase = createSupabaseAdminClient()
+
+  try {
+    if (eventType === 'organization.deleted') {
+      // Mark organization as inactive instead of deleting
+      const { error } = await supabase
+        .from('organizations')
+        .update({ is_active: false })
+        .eq('clerk_org_id', organization.id)
+
+      if (error) throw error
+      return { success: true }
+    }
+
+    // Prepare organization data
+    const orgData = {
+      clerk_org_id: organization.id,
+      name: organization.name,
+      subdomain: organization.slug || organization.name.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+      logo_url: organization.imageUrl || null,
+      settings: organization.metadata || {},
+      is_active: true
+    }
+
+    if (eventType === 'organization.created') {
+      // Create new organization
+      const { error } = await supabase
+        .from('organizations')
+        .insert(orgData)
+
+      if (error) throw error
+    } else if (eventType === 'organization.updated') {
+      // Update existing organization
+      const { error } = await supabase
+        .from('organizations')
+        .upsert(orgData, { onConflict: 'clerk_org_id' })
+
+      if (error) throw error
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error syncing organization to Supabase:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+}
+
+export async function syncMembershipToSupabase({ membership, eventType }: SyncMembershipOptions) {
+  const supabase = createSupabaseAdminClient()
+
+  try {
+    if (eventType === 'organizationMembership.deleted') {
+      // Mark membership as inactive instead of deleting
+      const { error } = await supabase
+        .from('organization_memberships')
+        .update({ is_active: false })
+        .eq('user_id', membership.userId)
+        .eq('organization_id', membership.organizationId)
+
+      if (error) throw error
+      return { success: true }
+    }
+
+    // Get the user and organization IDs from Supabase
+    const { data: user } = await supabase
+      .from('users')
+      .select('id')
+      .eq('clerk_user_id', membership.userId)
+      .single()
+
+    const { data: organization } = await supabase
+      .from('organizations')
+      .select('id')
+      .eq('clerk_org_id', membership.organizationId)
+      .single()
+
+    if (!user || !organization) {
+      throw new Error('User or organization not found in Supabase')
+    }
+
+    // Map Clerk role to our role enum
+    const roleMapping: Record<string, 'admin' | 'manager' | 'member'> = {
+      'admin': 'admin',
+      'basic_member': 'member',
+      'member': 'member'
+    }
+
+    const role = roleMapping[membership.role] || 'member'
+
+    // Prepare membership data
+    const membershipData = {
+      user_id: user.id,
+      organization_id: organization.id,
+      role: role,
+      is_active: true,
+      joined_at: new Date().toISOString()
+    }
+
+    if (eventType === 'organizationMembership.created') {
+      // Create new membership
+      const { error } = await supabase
+        .from('organization_memberships')
+        .insert(membershipData)
+
+      if (error) throw error
+    } else if (eventType === 'organizationMembership.updated') {
+      // Update existing membership
+      const { error } = await supabase
+        .from('organization_memberships')
+        .update({ role: role })
+        .eq('user_id', user.id)
+        .eq('organization_id', organization.id)
+
+      if (error) throw error
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error syncing membership to Supabase:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+}
+
+export async function getCurrentUserWithMemberships(clerkUserId: string) {
   const supabase = createSupabaseAdminClient()
 
   try {
@@ -97,16 +213,23 @@ export async function getCurrentUser(clerkUserId: string) {
       .from('users')
       .select(`
         *,
-        organizations (
+        organization_memberships!inner (
           id,
-          name,
-          domain,
-          slug,
-          settings
+          role,
+          is_active,
+          joined_at,
+          organization:organizations (
+            id,
+            name,
+            subdomain,
+            logo_url,
+            settings
+          )
         )
       `)
       .eq('clerk_user_id', clerkUserId)
       .eq('is_active', true)
+      .eq('organization_memberships.is_active', true)
       .single()
 
     if (error) throw error
@@ -121,17 +244,78 @@ export async function getUsersByOrganization(organizationId: string) {
   const supabase = createSupabaseAdminClient()
 
   try {
-    const { data: users, error } = await supabase
-      .from('users')
-      .select('*')
+    const { data: memberships, error } = await supabase
+      .from('organization_memberships')
+      .select(`
+        id,
+        role,
+        joined_at,
+        user:users (
+          id,
+          clerk_user_id,
+          email,
+          first_name,
+          last_name,
+          avatar_url,
+          is_active,
+          last_sign_in_at
+        )
+      `)
       .eq('organization_id', organizationId)
       .eq('is_active', true)
-      .order('created_at', { ascending: false })
+      .eq('users.is_active', true)
+      .order('joined_at', { ascending: false })
 
     if (error) throw error
-    return { users, error: null }
+    return { memberships, error: null }
   } catch (error) {
     console.error('Error fetching organization users:', error)
-    return { users: [], error: error instanceof Error ? error.message : 'Unknown error' }
+    return { memberships: [], error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+}
+
+export async function getOrganizationBySubdomain(subdomain: string) {
+  const supabase = createSupabaseAdminClient()
+
+  try {
+    const { data: organization, error } = await supabase
+      .from('organizations')
+      .select('*')
+      .eq('subdomain', subdomain)
+      .eq('is_active', true)
+      .single()
+
+    if (error) throw error
+    return { organization, error: null }
+  } catch (error) {
+    console.error('Error fetching organization by subdomain:', error)
+    return { organization: null, error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+}
+
+export async function getUserMembershipInOrganization(clerkUserId: string, organizationId: string) {
+  const supabase = createSupabaseAdminClient()
+
+  try {
+    const { data: membership, error } = await supabase
+      .from('organization_memberships')
+      .select(`
+        id,
+        role,
+        is_active,
+        joined_at,
+        user:users!inner (id, clerk_user_id),
+        organization:organizations (id, name, subdomain)
+      `)
+      .eq('users.clerk_user_id', clerkUserId)
+      .eq('organization_id', organizationId)
+      .eq('is_active', true)
+      .single()
+
+    if (error) throw error
+    return { membership, error: null }
+  } catch (error) {
+    console.error('Error fetching user membership:', error)
+    return { membership: null, error: error instanceof Error ? error.message : 'Unknown error' }
   }
 }

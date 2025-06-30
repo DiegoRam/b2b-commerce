@@ -1,14 +1,38 @@
 import { headers } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 import { Webhook } from 'svix'
-import { syncUserToSupabase } from '@/lib/syncUser'
+import { syncUserToSupabase, syncOrganizationToSupabase, syncMembershipToSupabase } from '@/lib/syncUser'
 import type { User } from '@clerk/nextjs/server'
 
 // Define the webhook event types we're interested in
-type WebhookEvent = {
+type UserWebhookEvent = {
   type: 'user.created' | 'user.updated' | 'user.deleted'
   data: User
 }
+
+type OrganizationWebhookEvent = {
+  type: 'organization.created' | 'organization.updated' | 'organization.deleted'
+  data: {
+    id: string
+    name: string
+    slug?: string
+    image_url?: string
+    metadata?: Record<string, unknown>
+  }
+}
+
+type MembershipWebhookEvent = {
+  type: 'organizationMembership.created' | 'organizationMembership.updated' | 'organizationMembership.deleted'
+  data: {
+    user_id: string
+    organization: {
+      id: string
+    }
+    role: string
+  }
+}
+
+type WebhookEvent = UserWebhookEvent | OrganizationWebhookEvent | MembershipWebhookEvent
 
 export async function POST(req: NextRequest) {
   // Get the headers
@@ -51,20 +75,52 @@ export async function POST(req: NextRequest) {
   console.log(`Webhook received: ${type}`)
 
   try {
-    // Sync user to Supabase based on the event type
-    const result = await syncUserToSupabase({
-      user: data,
-      eventType: type,
-    })
+    let result
+
+    // Handle different event types
+    if (type.startsWith('user.')) {
+      // User events
+      result = await syncUserToSupabase({
+        user: data as User,
+        eventType: type as 'user.created' | 'user.updated' | 'user.deleted',
+      })
+    } else if (type.startsWith('organization.')) {
+      // Organization events
+      const orgData = data as OrganizationWebhookEvent['data']
+      result = await syncOrganizationToSupabase({
+        organization: {
+          id: orgData.id,
+          name: orgData.name,
+          slug: orgData.slug,
+          imageUrl: orgData.image_url,
+          metadata: orgData.metadata,
+        },
+        eventType: type as 'organization.created' | 'organization.updated' | 'organization.deleted',
+      })
+    } else if (type.startsWith('organizationMembership.')) {
+      // Membership events
+      const membershipData = data as MembershipWebhookEvent['data']
+      result = await syncMembershipToSupabase({
+        membership: {
+          userId: membershipData.user_id,
+          organizationId: membershipData.organization.id,
+          role: membershipData.role,
+        },
+        eventType: type as 'organizationMembership.created' | 'organizationMembership.updated' | 'organizationMembership.deleted',
+      })
+    } else {
+      console.log(`Unhandled webhook event type: ${type}`)
+      return new NextResponse('Event type not handled', { status: 200 })
+    }
 
     if (!result.success) {
-      console.error('Failed to sync user to Supabase:', result.error)
-      return new NextResponse('Error syncing user', {
+      console.error(`Failed to sync ${type} to Supabase:`, result.error)
+      return new NextResponse('Error syncing to database', {
         status: 500,
       })
     }
 
-    console.log(`Successfully processed ${type} for user ${data.id}`)
+    console.log(`Successfully processed ${type}`)
     
     return new NextResponse('Success', {
       status: 200,
