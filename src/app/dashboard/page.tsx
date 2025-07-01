@@ -1,23 +1,30 @@
-import { auth } from '@clerk/nextjs/server'
-import { redirect } from 'next/navigation'
-import { getCurrentUser } from '@/lib/syncUser'
+'use client'
+
+import { useUser } from '@clerk/nextjs'
+import { useSubdomain } from '@/components/providers/SubdomainProvider'
 import { Package, ShoppingCart, Users, TrendingUp } from 'lucide-react'
 
-export default async function DashboardPage() {
-  const { userId } = await auth()
-  
-  if (!userId) {
-    redirect('/sign-in')
-  }
+// Force dynamic rendering for this page since it uses auth
+export const dynamic = 'force-dynamic'
 
-  // Get current user data from Supabase
-  const { user, error } = await getCurrentUser(userId)
+export default function DashboardPage() {
+  const { user: clerkUser } = useUser()
+  const { currentOrganization, userRole, isLoading } = useSubdomain()
 
-  if (error || !user) {
+  if (isLoading) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-600">Error loading user data: {error}</p>
-        <p className="text-sm text-gray-500 mt-2">Please try refreshing the page</p>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+        <p className="mt-2 text-sm text-gray-600">Loading dashboard...</p>
+      </div>
+    )
+  }
+
+  if (!currentOrganization || !userRole) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-red-600">Unable to load organization data</p>
+        <p className="text-sm text-gray-500 mt-2">Please check your access permissions</p>
       </div>
     )
   }
@@ -27,13 +34,13 @@ export default async function DashboardPage() {
       {/* Welcome Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900">
-          Welcome back, {user.first_name || 'User'}!
+          Welcome back, {clerkUser?.firstName || 'User'}!
         </h1>
         <p className="text-gray-600 mt-2">
-          Organization: {user.organizations?.name || 'Unknown Organization'}
+          Organization: {currentOrganization.name}
         </p>
         <p className="text-sm text-gray-500">
-          Role: {user.role?.charAt(0).toUpperCase() + user.role?.slice(1)}
+          Role: {userRole.charAt(0).toUpperCase() + userRole.slice(1)}
         </p>
       </div>
 

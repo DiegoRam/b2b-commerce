@@ -53,6 +53,10 @@ export type OrganizationContext = {
   userMemberships: OrganizationMembership[]
   userRole: UserRole | null
   isLoading: boolean
+  hasAccess: boolean
+  subdomainInfo: SubdomainInfo
+  switchToOrganization: (organizationSubdomain: string) => void
+  refetch: () => void
 }
 
 // API response types

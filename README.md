@@ -182,6 +182,8 @@ CREATE POLICY "Users can view own organization users" ON users FOR SELECT USING 
 
 ## 🚀 Development
 
+### Standard Development
+
 1. **Start the development server**:
    ```bash
    npm run dev
@@ -190,15 +192,184 @@ CREATE POLICY "Users can view own organization users" ON users FOR SELECT USING 
 2. **Open your browser**:
    Navigate to [http://localhost:3000](http://localhost:3000)
 
-3. **Available routes**:
-   - `/` - Landing page
-   - `/sign-in` - User sign-in
-   - `/sign-up` - User registration
-   - `/dashboard` - Main dashboard (protected)
-   - `/dashboard/products` - Product management (coming soon)
-   - `/dashboard/orders` - Order management (coming soon)
-   - `/dashboard/users` - User management (coming soon)
-   - `/dashboard/settings` - Organization settings (coming soon)
+### 🌐 Subdomain Testing Setup
+
+The application uses subdomain-based multi-tenancy. Follow these steps to test subdomain functionality:
+
+#### 1. Configure Local Subdomains
+
+**Option A: Browser-only (Recommended for quick testing)**
+- Chrome/Firefox automatically resolve `*.localhost` domains
+- No additional configuration needed
+- Access: `http://educabot.localhost:3000`, `http://minimalart.localhost:3000`
+
+**Option B: System hosts file (For advanced testing)**
+Add to `/etc/hosts` (macOS/Linux) or `C:\Windows\System32\drivers\etc\hosts` (Windows):
+```
+127.0.0.1 educabot.localhost
+127.0.0.1 minimalart.localhost
+127.0.0.1 testorg.localhost
+```
+
+#### 2. Set Up Test Organizations in Clerk
+
+1. **Go to Clerk Dashboard** → Organizations
+2. **Create test organizations** with specific slugs:
+   ```
+   Organization Name: "Educabot"
+   Slug: "educabot"
+   
+   Organization Name: "Minimal Art" 
+   Slug: "minimalart"
+   
+   Organization Name: "Test Organization"
+   Slug: "testorg"
+   ```
+
+3. **Add test users to organizations** with different roles:
+   - Add the same user to multiple organizations
+   - Assign different roles (admin, manager, member) per organization
+
+#### 3. Test Subdomain Access
+
+Once the server is running (`npm run dev`):
+
+**Multi-Organization User Testing:**
+```bash
+# Main domain - should show organization selection
+http://localhost:3000
+
+# Educabot organization - should load Educabot data
+http://educabot.localhost:3000
+
+# Minimal Art organization - should load Minimal Art data  
+http://minimalart.localhost:3000
+
+# Test organization - should load Test org data
+http://testorg.localhost:3000
+```
+
+**Access Control Testing:**
+- Try accessing a subdomain the user doesn't belong to
+- Should see "Access Denied" with organization switcher
+- Should show available organizations for the user
+
+#### 4. Expected Behavior
+
+✅ **Valid subdomain + authorized user**: Organization dashboard loads  
+✅ **Valid subdomain + unauthorized user**: Access denied screen  
+✅ **Invalid subdomain**: Organization selection or first available org  
+✅ **Multi-org user**: Can switch between organizations seamlessly  
+
+### 🧪 Development Commands
+
+```bash
+# Start development server
+npm run dev
+
+# Type checking without build (useful during development)
+npx tsc --noEmit
+
+# Linting
+npm run lint
+
+# Build (requires valid API keys)
+npm run build
+```
+
+### 🔧 Available Routes
+
+**Public Routes:**
+- `/` - Landing page / Organization selection
+- `/sign-in` - User sign-in  
+- `/sign-up` - User registration
+
+**Protected Routes (require authentication + organization access):**
+- `/dashboard` - Organization-specific dashboard
+- `/dashboard/products` - Product management (coming soon)
+- `/dashboard/orders` - Order management (coming soon) 
+- `/dashboard/users` - User management (coming soon)
+- `/dashboard/settings` - Organization settings (coming soon)
+
+**API Routes:**
+- `/api/webhooks/clerk` - Clerk webhook handler (user/org sync)
+
+### 🐛 Troubleshooting Subdomain Setup
+
+#### Common Issues & Solutions
+
+**🔸 "Organization not found" Error**
+```bash
+# Check if organizations exist in database
+SELECT * FROM organizations WHERE subdomain = 'educabot';
+
+# Verify Clerk organization slug matches subdomain
+# Clerk Dashboard → Organizations → Check slug field
+```
+*Solution*: Ensure Clerk organization slug exactly matches the subdomain name.
+
+**🔸 "Access Denied" for Valid User**
+```bash
+# Check user membership in database
+SELECT om.*, o.name, u.email 
+FROM organization_memberships om
+JOIN organizations o ON o.id = om.organization_id  
+JOIN users u ON u.id = om.user_id
+WHERE u.clerk_user_id = 'your_clerk_user_id';
+```
+*Solution*: Verify user is added to organization in Clerk and webhook has synced the membership.
+
+**🔸 Subdomain Not Detected**
+- Ensure using `http://subdomain.localhost:3000` format
+- Check browser network tab for correct Host header
+- Verify middleware is running (check server logs)
+
+**🔸 Webhook Not Syncing Data**
+1. Check webhook URL in Clerk Dashboard: `https://your-domain.com/api/webhooks/clerk`
+2. Verify webhook secret in `.env.local`
+3. Check webhook logs in Clerk Dashboard
+4. Look for errors in application server logs
+
+**🔸 Build Failures During Development**
+```bash
+# Use TypeScript check instead of full build during development
+npx tsc --noEmit
+
+# Or run with skip build step
+npm run dev
+```
+*Note*: Build failures with placeholder API keys are normal during development.
+
+#### Quick Health Check
+
+Run these steps to verify your setup:
+
+1. **Database Connection**:
+   ```sql
+   -- Check if tables exist
+   SELECT table_name FROM information_schema.tables 
+   WHERE table_schema = 'public';
+   ```
+
+2. **API Keys Validation**:
+   - Clerk keys should start with `pk_test_` or `pk_live_`
+   - Supabase URL should be `https://your-project.supabase.co`
+
+3. **Organization Sync Test**:
+   ```bash
+   # Check if webhook endpoint responds
+   curl -X POST http://localhost:3000/api/webhooks/clerk \
+     -H "Content-Type: application/json" \
+     -d '{"test": true}'
+   ```
+
+#### Debug Mode
+
+Enable detailed logging by adding to your `.env.local`:
+```env
+NODE_ENV=development
+DEBUG=clerk:*
+```
 
 ## 🏗️ Project Structure
 

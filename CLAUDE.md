@@ -209,15 +209,122 @@ The application should achieve:
 
 ## Local Development Setup
 
-### Subdomain Testing
-- Use `educabot.localhost:3000` and `minimalart.localhost:3000` for testing
-- Configure `/etc/hosts` if needed for subdomain testing:
-  ```
-  127.0.0.1 educabot.localhost
-  127.0.0.1 minimalart.localhost
-  ```
-- Set up test organizations in Clerk with matching subdomains
-- Test multi-organization user flows
+### Prerequisites for Subdomain Testing
+1. **Valid Clerk API Keys** - Replace placeholder keys in `.env.local`
+2. **Supabase Database** - Set up with the complete schema (see README.md)
+3. **Test Organizations** - Create in Clerk Dashboard with specific subdomains
+
+### Subdomain Testing Configuration
+
+#### Step 1: Environment Setup
+Ensure your `.env.local` has valid keys (not the placeholder ones):
+```env
+# Replace with your actual Clerk keys
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_or_test_your_actual_key
+CLERK_SECRET_KEY=sk_live_or_test_your_actual_key
+CLERK_WEBHOOK_SECRET=whsec_your_actual_webhook_secret
+
+# Replace with your actual Supabase keys
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_actual_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_actual_service_role_key
+```
+
+#### Step 2: Hosts File Configuration (Optional)
+Add these lines to `/etc/hosts` (macOS/Linux) or `C:\Windows\System32\drivers\etc\hosts` (Windows):
+```
+127.0.0.1 educabot.localhost
+127.0.0.1 minimalart.localhost
+127.0.0.1 testorg.localhost
+```
+
+#### Step 3: Database Setup
+Run the complete SQL schema in your Supabase SQL editor (see README.md for full schema).
+
+#### Step 4: Clerk Organization Setup
+1. Go to Clerk Dashboard → Organizations
+2. Create test organizations:
+   - **Educabot Organization** with slug: `educabot`
+   - **Minimal Art Organization** with slug: `minimalart`
+   - **Test Organization** with slug: `testorg`
+
+#### Step 5: Add Test Users
+1. Create a test user account
+2. Add the user to multiple organizations with different roles:
+   - `educabot` - Admin role
+   - `minimalart` - Manager role
+   - `testorg` - Member role
+
+### Testing Workflow
+
+#### Start Development Server
+```bash
+npm run dev
+```
+
+#### Test Subdomain Access
+1. **Main domain**: `http://localhost:3000`
+   - Should show organization selection if user belongs to multiple orgs
+   - Should redirect to first available org if user belongs to one
+
+2. **Educabot subdomain**: `http://educabot.localhost:3000`
+   - Should load Educabot organization data
+   - User should see Admin role if configured correctly
+   - Dashboard should show "Welcome to Educabot"
+
+3. **Minimal Art subdomain**: `http://minimalart.localhost:3000`
+   - Should load Minimal Art organization data
+   - User should see Manager role if configured correctly
+   - Dashboard should show "Welcome to Minimal Art"
+
+4. **Access Control Testing**:
+   - Log in user who only has access to one organization
+   - Try accessing a different subdomain
+   - Should see "Access Denied" screen with organization switcher
+
+### Troubleshooting Subdomain Testing
+
+#### Common Issues:
+
+1. **"Organization not found"**
+   - Check Clerk organization slugs match subdomain names
+   - Verify database has organizations with correct `subdomain` field
+   - Check webhook is properly syncing organizations
+
+2. **"Access Denied" for valid user**
+   - Verify user membership in organization_memberships table
+   - Check organization_memberships.is_active = true
+   - Ensure webhook synced the membership correctly
+
+3. **Subdomain not detected**
+   - Verify `/etc/hosts` configuration
+   - Check browser is using the full subdomain URL
+   - Review middleware subdomain extraction logic
+
+4. **Build failures with Clerk keys**
+   - Normal during development with placeholder keys
+   - Use `npx tsc --noEmit` to check TypeScript without building
+   - Replace with real keys for actual testing
+
+### Expected User Flows
+
+#### Multi-Organization User Journey:
+1. User signs up/signs in
+2. If belongs to multiple orgs → organization selection screen
+3. User clicks on an organization → redirected to that subdomain
+4. User sees organization-specific dashboard with their role
+5. User can switch organizations using the organization switcher
+
+#### Single Organization User Journey:
+1. User signs up/signs in
+2. Automatically redirected to their organization's subdomain
+3. User sees organization-specific dashboard
+
+#### Access Control Testing:
+1. User tries to access subdomain they don't belong to
+2. "Access Denied" screen appears
+3. Shows list of available organizations
+4. User can click to switch to accessible organization
 
 ### POC Deliverables
 1. Next.js app with subdomain detection middleware
