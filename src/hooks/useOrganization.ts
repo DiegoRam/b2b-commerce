@@ -50,6 +50,26 @@ export function useOrganization(): OrganizationContext {
     }
   }
 
+  // Clear state when user logs out
+  useEffect(() => {
+    if (!isLoaded) return
+    
+    // If user is not authenticated (logged out), clear all state
+    if (!userId) {
+      console.log('User logged out, clearing organization state')
+      setCurrentOrganization(null)
+      setUserMemberships([])
+      setUserRole(null)
+      setIsLoading(false)
+      setSubdomainInfo({
+        subdomain: '',
+        isValid: false,
+        organization: null
+      })
+      return
+    }
+  }, [isLoaded, userId])
+
   // Initialize subdomain detection and data fetching
   useEffect(() => {
     if (!isLoaded || !userId) return

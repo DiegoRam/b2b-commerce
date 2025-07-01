@@ -29,6 +29,33 @@ export default function Home() {
     }
   }, [isSignedIn, userMemberships, switchToOrganization, subdomainInfo, isLoading])
 
+  useEffect(() => {
+    // Handle valid subdomain access - redirect to dashboard if user has access
+    if (isSignedIn && subdomainInfo.isValid && userMemberships.length > 0 && !isLoading) {
+      console.log('Valid subdomain detected:', subdomainInfo.subdomain)
+      
+      // Check if user has access to this specific organization
+      const hasAccessToCurrentOrg = userMemberships.some(
+        membership => membership.organization?.subdomain === subdomainInfo.subdomain
+      )
+      
+      if (hasAccessToCurrentOrg) {
+        console.log('User has access to current organization, redirecting to dashboard')
+        window.location.href = '/dashboard'
+      } else {
+        console.log('User does not have access to current organization')
+        // If user has other organizations, redirect to the first available one
+        if (userMemberships.length > 0) {
+          const firstOrgSubdomain = userMemberships[0].organization?.subdomain
+          if (firstOrgSubdomain) {
+            console.log('Redirecting to accessible organization:', firstOrgSubdomain)
+            switchToOrganization(firstOrgSubdomain)
+          }
+        }
+      }
+    }
+  }, [isSignedIn, subdomainInfo, userMemberships, isLoading, switchToOrganization])
+
   // Show loading while auth is loading
   if (!isLoaded) {
     return (

@@ -16,7 +16,7 @@ interface SubdomainProviderProps {
 // Provider component
 export function SubdomainProvider({ children }: SubdomainProviderProps) {
   const organizationData = useOrganization()
-  const { isSignedIn, isLoaded } = useAuth()
+  const { isSignedIn, isLoaded, userId } = useAuth()
   const [mounted, setMounted] = useState(false)
 
   // Handle client-side mounting
@@ -37,7 +37,8 @@ export function SubdomainProvider({ children }: SubdomainProviderProps) {
   }
 
   // Handle organization access validation for signed-in users
-  if (isSignedIn && organizationData.subdomainInfo.isValid) {
+  // Only proceed if user is truly signed in, has userId, and auth is fully loaded
+  if (isSignedIn && userId && isLoaded && organizationData.subdomainInfo.isValid) {
     // Show loading while organization data is being fetched
     if (organizationData.isLoading) {
       return (
@@ -53,7 +54,8 @@ export function SubdomainProvider({ children }: SubdomainProviderProps) {
     }
 
     // Show access denied if user doesn't have access to this organization
-    if (!organizationData.hasAccess) {
+    // But only if we have loaded user memberships (to avoid showing when data is still loading)
+    if (!organizationData.hasAccess && organizationData.userMemberships.length >= 0) {
       return (
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center max-w-md mx-auto p-6">
@@ -89,7 +91,7 @@ export function SubdomainProvider({ children }: SubdomainProviderProps) {
   }
 
   // Handle invalid subdomain for signed-in users
-  if (isSignedIn && !organizationData.subdomainInfo.isValid && organizationData.userMemberships.length > 0) {
+  if (isSignedIn && userId && isLoaded && !organizationData.subdomainInfo.isValid && organizationData.userMemberships.length > 0) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center max-w-md mx-auto p-6">
