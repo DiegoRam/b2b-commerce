@@ -52,32 +52,15 @@ export function useOrganization(): OrganizationContext {
 
   // Initialize subdomain detection and data fetching
   useEffect(() => {
-    if (!isLoaded) return
+    if (!isLoaded || !userId) return
 
-    // Fetch organization data based on subdomain
-    const fetchOrganizationData = async (subdomain: string) => {
-      if (!subdomain || !userId) return
-
+    // Fetch user memberships across all organizations (always needed)
+    const fetchUserMemberships = async () => {
       const supabase = createSupabaseBrowserClient()
 
       try {
-        // Fetch organization by subdomain
-        const { data: organization, error: orgError } = await supabase
-          .from('organizations')
-          .select('*')
-          .eq('subdomain', subdomain)
-          .eq('is_active', true)
-          .single()
-
-        if (orgError || !organization) {
-          console.error('Organization not found for subdomain:', subdomain)
-          setCurrentOrganization(null)
-          setUserRole(null)
-          return
-        }
-
-        setCurrentOrganization(organization)
-
+        console.log('Fetching user memberships for user:', userId)
+        
         // Fetch user's memberships across all organizations
         const { data: userMembershipsData, error: membershipsError } = await supabase
           .from('organization_memberships')
@@ -119,7 +102,7 @@ export function useOrganization(): OrganizationContext {
         if (membershipsError) {
           console.error('Error fetching user memberships:', membershipsError)
           setUserMemberships([])
-          return
+          return []
         }
 
         // Transform the data to match our expected type structure
@@ -133,14 +116,51 @@ export function useOrganization(): OrganizationContext {
             : membership.user
         }))
         
+        console.log('User memberships found:', transformedMemberships.length)
         setUserMemberships(transformedMemberships)
+        return transformedMemberships
+
+      } catch (error) {
+        console.error('Error fetching user memberships:', error)
+        setUserMemberships([])
+        return []
+      }
+    }
+
+    // Fetch organization data based on subdomain
+    const fetchOrganizationData = async (subdomain: string, memberships: any[]) => {
+      if (!subdomain) return
+
+      const supabase = createSupabaseBrowserClient()
+
+      try {
+        console.log('Fetching organization for subdomain:', subdomain)
+        
+        // Fetch organization by subdomain
+        const { data: organization, error: orgError } = await supabase
+          .from('organizations')
+          .select('*')
+          .eq('subdomain', subdomain)
+          .eq('is_active', true)
+          .single()
+
+        if (orgError || !organization) {
+          console.error('Organization not found for subdomain:', subdomain, orgError)
+          setCurrentOrganization(null)
+          setUserRole(null)
+          return
+        }
+
+        console.log('Organization found:', organization.name)
+        setCurrentOrganization(organization)
 
         // Find user's role in current organization
-        const currentMembership = transformedMemberships.find(
+        const currentMembership = memberships.find(
           membership => membership.organization?.id === organization.id
         )
 
         if (currentMembership) {
+          console.log('User role in organization:', currentMembership.role)
           setUserRole(currentMembership.role)
         } else {
           console.warn('User does not have access to this organization')
@@ -150,22 +170,37 @@ export function useOrganization(): OrganizationContext {
       } catch (error) {
         console.error('Error fetching organization data:', error)
         setCurrentOrganization(null)
-        setUserMemberships([])
         setUserRole(null)
       }
     }
 
-    const info = getSubdomainInfo()
-    setSubdomainInfo(info)
-
-    if (info.isValid && userId) {
+    const fetchData = async () => {
       setIsLoading(true)
-      fetchOrganizationData(info.subdomain).finally(() => {
+      
+      try {
+        // Always fetch user memberships first
+        const memberships = await fetchUserMemberships()
+        
+        // Get subdomain info
+        const info = getSubdomainInfo()
+        setSubdomainInfo(info)
+        console.log('Subdomain info:', info)
+
+        // If we have a valid subdomain, fetch organization-specific data
+        if (info.isValid && info.subdomain) {
+          await fetchOrganizationData(info.subdomain, memberships)
+        } else {
+          // No subdomain - clear organization-specific data but keep memberships
+          setCurrentOrganization(null)
+          setUserRole(null)
+          console.log('No subdomain detected, memberships available for selection')
+        }
+      } finally {
         setIsLoading(false)
-      })
-    } else {
-      setIsLoading(false)
+      }
     }
+
+    fetchData()
   }, [userId, isLoaded])
 
   // Function to switch to a different organization

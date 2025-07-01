@@ -64,110 +64,46 @@ Before running this project, make sure you have:
 
 ## 🗄️ Database Setup
 
-### Supabase Schema
+### Fresh Multi-Organization Schema
 
-Run the following SQL commands in your Supabase SQL editor to set up the database schema:
+**For POC/Development**: Use the complete fresh schema script that creates the entire multi-organization database from scratch.
 
-```sql
--- Create organizations table
-CREATE TABLE organizations (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  name TEXT NOT NULL,
-  domain TEXT UNIQUE NOT NULL,
-  slug TEXT UNIQUE NOT NULL,
-  logo_url TEXT,
-  settings JSONB DEFAULT '{}',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+1. **Copy the schema script**:
+   ```bash
+   # The file fresh_multi_org_schema.sql contains the complete database schema
+   ```
 
--- Create users table
-CREATE TABLE users (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  clerk_user_id TEXT UNIQUE NOT NULL,
-  email TEXT NOT NULL,
-  first_name TEXT NOT NULL,
-  last_name TEXT NOT NULL,
-  avatar_url TEXT,
-  organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
-  role TEXT DEFAULT 'member' CHECK (role IN ('admin', 'manager', 'member')),
-  is_active BOOLEAN DEFAULT true,
-  last_sign_in_at TIMESTAMP WITH TIME ZONE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+2. **Run in Supabase SQL Editor**:
+   - Go to your Supabase project
+   - Navigate to "SQL Editor"
+   - Copy and paste the entire contents of `fresh_multi_org_schema.sql`
+   - Execute the script
 
--- Create products table
-CREATE TABLE products (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  description TEXT,
-  price DECIMAL(10,2) NOT NULL,
-  sku TEXT NOT NULL,
-  stock_quantity INTEGER DEFAULT 0,
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(organization_id, sku)
-);
+3. **What gets created**:
+   - ✅ Complete multi-organization table structure
+   - ✅ Row Level Security policies for data isolation
+   - ✅ Performance indexes for fast queries
+   - ✅ Sample test data for 3 organizations
+   - ✅ Sample users with multi-organization memberships
+   - ✅ Sample products and orders for testing
 
--- Create orders table
-CREATE TABLE orders (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  total_amount DECIMAL(10,2) NOT NULL,
-  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'shipped', 'delivered', 'cancelled')),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+### Sample Organizations Created
 
--- Create order_items table
-CREATE TABLE order_items (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  order_id UUID REFERENCES orders(id) ON DELETE CASCADE,
-  product_id UUID REFERENCES products(id) ON DELETE CASCADE,
-  quantity INTEGER NOT NULL,
-  unit_price DECIMAL(10,2) NOT NULL,
-  total_price DECIMAL(10,2) NOT NULL
-);
+The schema includes test data for immediate testing:
 
--- Create updated_at triggers
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ language 'plpgsql';
+| Organization | Subdomain | Test User | Role |
+|-------------|-----------|-----------|------|
+| Educabot | `educabot` | multiorg@example.com | admin |
+| Minimal Art | `minimalart` | multiorg@example.com | manager |
+| Test Company | `testorg` | multiorg@example.com | member |
 
-CREATE TRIGGER update_organizations_updated_at BEFORE UPDATE ON organizations FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_products_updated_at BEFORE UPDATE ON products FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_orders_updated_at BEFORE UPDATE ON orders FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+### Database Features
 
--- Enable Row Level Security
-ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE products ENABLE ROW LEVEL SECURITY;
-ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
-ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
-
--- Create RLS policies (basic examples - customize based on your needs)
--- Users can only access their own organization's data
-CREATE POLICY "Users can view own organization" ON organizations FOR SELECT USING (
-  id IN (
-    SELECT organization_id FROM users WHERE clerk_user_id = auth.jwt() ->> 'sub'
-  )
-);
-
-CREATE POLICY "Users can view own organization users" ON users FOR SELECT USING (
-  organization_id IN (
-    SELECT organization_id FROM users WHERE clerk_user_id = auth.jwt() ->> 'sub'
-  )
-);
-```
+- **Multi-organization users**: Users can belong to multiple organizations with different roles
+- **Subdomain routing**: Each organization has a unique subdomain for access
+- **Data isolation**: Row Level Security ensures organization-scoped data access
+- **Performance optimized**: Comprehensive indexes for fast queries
+- **Clerk integration**: Ready for Clerk organization and user synchronization
 
 ### Clerk Webhook Setup
 
@@ -178,7 +114,28 @@ CREATE POLICY "Users can view own organization users" ON users FOR SELECT USING 
    - `user.created`
    - `user.updated`
    - `user.deleted`
+   - `organization.created`
+   - `organization.updated`
+   - `organization.deleted`
+   - `organizationMembership.created`
+   - `organizationMembership.updated`
+   - `organizationMembership.deleted`
 5. Copy the webhook secret and add it to your `.env.local` file
+
+### Update Organization IDs
+
+After running the fresh schema, update the organizations with your actual Clerk organization IDs:
+
+```sql
+-- Replace with your actual Clerk organization IDs
+UPDATE organizations 
+SET clerk_org_id = 'org_your_actual_clerk_id_here'
+WHERE subdomain = 'educabot';
+
+UPDATE organizations 
+SET clerk_org_id = 'org_your_actual_clerk_id_here'
+WHERE subdomain = 'minimalart';
+```
 
 ## 🚀 Development
 
@@ -344,23 +301,41 @@ npm run dev
 
 Run these steps to verify your setup:
 
-1. **Database Connection**:
+1. **Database Schema Verification**:
    ```sql
-   -- Check if tables exist
+   -- Check if all tables exist
    SELECT table_name FROM information_schema.tables 
-   WHERE table_schema = 'public';
+   WHERE table_schema = 'public' 
+   ORDER BY table_name;
+   
+   -- Should show: organization_memberships, organizations, order_items, orders, products, users
    ```
 
-2. **API Keys Validation**:
+2. **Sample Data Verification**:
+   ```sql
+   -- Check organizations
+   SELECT name, subdomain, clerk_org_id FROM organizations;
+   
+   -- Check multi-org memberships
+   SELECT * FROM user_organization_memberships;
+   
+   -- Check sample products
+   SELECT o.name as org, p.name as product, p.price 
+   FROM products p 
+   JOIN organizations o ON o.id = p.organization_id;
+   ```
+
+3. **API Keys Validation**:
    - Clerk keys should start with `pk_test_` or `pk_live_`
    - Supabase URL should be `https://your-project.supabase.co`
 
-3. **Organization Sync Test**:
+4. **Subdomain Testing**:
    ```bash
-   # Check if webhook endpoint responds
-   curl -X POST http://localhost:3000/api/webhooks/clerk \
-     -H "Content-Type: application/json" \
-     -d '{"test": true}'
+   # Test main domain
+   curl -I http://localhost:3000
+   
+   # Test subdomain (should work with modern browsers)
+   curl -I http://educabot.localhost:3000
    ```
 
 #### Debug Mode

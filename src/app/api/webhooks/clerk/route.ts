@@ -2,12 +2,29 @@ import { headers } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 import { Webhook } from 'svix'
 import { syncUserToSupabase, syncOrganizationToSupabase, syncMembershipToSupabase } from '@/lib/syncUser'
-import type { User } from '@clerk/nextjs/server'
 
-// Define the webhook event types we're interested in
+// Define the webhook event types based on actual Clerk webhook payload structure
 type UserWebhookEvent = {
   type: 'user.created' | 'user.updated' | 'user.deleted'
-  data: User
+  data: {
+    id: string
+    email_addresses: Array<{
+      email_address: string
+      id: string
+      verification?: {
+        status: string
+      }
+    }>
+    first_name?: string | null
+    last_name?: string | null
+    image_url?: string
+    username?: string
+    created_at: number
+    updated_at: number
+    last_sign_in_at?: number | null
+    banned?: boolean
+    locked?: boolean
+  }
 }
 
 type OrganizationWebhookEvent = {
@@ -18,17 +35,33 @@ type OrganizationWebhookEvent = {
     slug?: string
     image_url?: string
     metadata?: Record<string, unknown>
+    created_at: number
+    updated_at: number
   }
 }
 
 type MembershipWebhookEvent = {
   type: 'organizationMembership.created' | 'organizationMembership.updated' | 'organizationMembership.deleted'
   data: {
-    user_id: string
+    id: string
     organization: {
       id: string
+      name: string
+      slug?: string
+      created_at: number
+      updated_at: number
+    }
+    public_user_data: {
+      user_id: string
+      first_name?: string | null
+      last_name?: string | null
+      identifier: string
+      image_url?: string
     }
     role: string
+    role_name?: string
+    created_at: number
+    updated_at: number
   }
 }
 
@@ -73,15 +106,17 @@ export async function POST(req: NextRequest) {
   // Handle the webhook event
   const { type, data } = evt
   console.log(`Webhook received: ${type}`)
+  console.log('Webhook data:', JSON.stringify(data, null, 2))
 
   try {
     let result
 
     // Handle different event types
     if (type.startsWith('user.')) {
-      // User events
+      // User events - pass the raw webhook data
+      const userData = data as UserWebhookEvent['data']
       result = await syncUserToSupabase({
-        user: data as User,
+        user: userData,
         eventType: type as 'user.created' | 'user.updated' | 'user.deleted',
       })
     } else if (type.startsWith('organization.')) {
@@ -102,7 +137,7 @@ export async function POST(req: NextRequest) {
       const membershipData = data as MembershipWebhookEvent['data']
       result = await syncMembershipToSupabase({
         membership: {
-          userId: membershipData.user_id,
+          userId: membershipData.public_user_data.user_id,
           organizationId: membershipData.organization.id,
           role: membershipData.role,
         },

@@ -1,103 +1,115 @@
-import Image from "next/image";
+'use client'
+
+import { useEffect } from 'react'
+import { useAuth } from '@clerk/nextjs'
+import { useSubdomain } from '@/components/providers/SubdomainProvider'
+import { Building2 } from 'lucide-react'
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const { isSignedIn, isLoaded } = useAuth()
+  const { userMemberships, switchToOrganization, subdomainInfo, isLoading } = useSubdomain()
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
+  useEffect(() => {
+    // Only redirect if we're on the main domain (no subdomain) and user is signed in
+    if (isSignedIn && !subdomainInfo.isValid && userMemberships.length > 0 && !isLoading) {
+      console.log('Auto-redirect logic triggered:', { 
+        userMemberships: userMemberships.length, 
+        subdomainInfo 
+      })
+      
+      if (userMemberships.length === 1) {
+        // Single organization - auto-redirect
+        const orgSubdomain = userMemberships[0].organization?.subdomain
+        if (orgSubdomain) {
+          console.log('Auto-redirecting to:', orgSubdomain)
+          switchToOrganization(orgSubdomain)
+        }
+      }
+      // If multiple organizations, let user choose (don't auto-redirect)
+    }
+  }, [isSignedIn, userMemberships, switchToOrganization, subdomainInfo, isLoading])
+
+  // Show loading while auth is loading
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-2 text-sm text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // If not signed in, show sign-in prompt
+  if (!isSignedIn) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6">
+          <Building2 className="h-16 w-16 text-blue-600 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">B2B E-commerce Platform</h1>
+          <p className="text-gray-600 mb-6">Sign in to access your organization's dashboard</p>
           <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/sign-in"
+            className="inline-block px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
+            Sign In
           </a>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </div>
+    )
+  }
+
+  // If signed in but no organizations, show error
+  if (userMemberships.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6">
+          <div className="rounded-full bg-orange-100 w-16 h-16 flex items-center justify-center mx-auto mb-4">
+            <Building2 className="w-8 h-8 text-orange-600" />
+          </div>
+          <h1 className="text-xl font-semibold text-gray-900 mb-2">No Organizations Found</h1>
+          <p className="text-gray-600 mb-4">
+            You don't belong to any organizations yet. Contact your administrator to get access.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // If multiple organizations, show selection
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-center max-w-md mx-auto p-6">
+        <Building2 className="h-16 w-16 text-blue-600 mx-auto mb-4" />
+        <h1 className="text-2xl font-bold text-gray-900 mb-4">Select Organization</h1>
+        <p className="text-gray-600 mb-6">Choose an organization to continue:</p>
+        <div className="space-y-3">
+          {userMemberships.map((membership) => (
+            <button
+              key={membership.id}
+              onClick={() => switchToOrganization(membership.organization?.subdomain || '')}
+              className="block w-full text-left px-4 py-3 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors"
+            >
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                  <span className="text-sm font-medium text-blue-800">
+                    {membership.organization?.name?.charAt(0).toUpperCase() || 'O'}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">
+                    {membership.organization?.name}
+                  </p>
+                  <p className="text-xs text-gray-500 capitalize">
+                    {membership.role}
+                  </p>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
-  );
+  )
 }

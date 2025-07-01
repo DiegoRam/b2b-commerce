@@ -1,8 +1,28 @@
 import { createSupabaseAdminClient } from './supabase'
-import type { User } from '@clerk/nextjs/server'
+
+// Define the webhook user data structure (matches Clerk webhook payload)
+export interface WebhookUserData {
+  id: string
+  email_addresses: Array<{
+    email_address: string
+    id: string
+    verification?: {
+      status: string
+    }
+  }>
+  first_name?: string | null
+  last_name?: string | null
+  image_url?: string
+  username?: string
+  created_at: number
+  updated_at: number
+  last_sign_in_at?: number | null
+  banned?: boolean
+  locked?: boolean
+}
 
 export interface SyncUserOptions {
-  user: User
+  user: WebhookUserData
   eventType: 'user.created' | 'user.updated' | 'user.deleted'
 }
 
@@ -30,6 +50,8 @@ export async function syncUserToSupabase({ user, eventType }: SyncUserOptions) {
   const supabase = createSupabaseAdminClient()
 
   try {
+    console.log(`Syncing user ${eventType}:`, user.id)
+
     if (eventType === 'user.deleted') {
       // Mark user as inactive instead of deleting
       const { error } = await supabase
@@ -38,25 +60,31 @@ export async function syncUserToSupabase({ user, eventType }: SyncUserOptions) {
         .eq('clerk_user_id', user.id)
 
       if (error) throw error
+      console.log(`User ${user.id} marked as inactive`)
       return { success: true }
     }
 
-    // Extract email for user creation
-    const email = user.emailAddresses[0]?.emailAddress
+    // Extract email for user creation (using webhook data structure)
+    const email = user.email_addresses?.[0]?.email_address
     if (!email) {
       throw new Error('User has no email address')
     }
+
+    // Convert timestamps to ISO strings
+    const lastSignInAt = user.last_sign_in_at ? new Date(user.last_sign_in_at).toISOString() : null
 
     // Prepare user data (no organization assignment here - handled by membership sync)
     const userData = {
       clerk_user_id: user.id,
       email: email,
-      first_name: user.firstName || null,
-      last_name: user.lastName || null,
-      avatar_url: user.imageUrl || null,
-      is_active: true,
-      last_sign_in_at: new Date().toISOString()
+      first_name: user.first_name || null,
+      last_name: user.last_name || null,
+      avatar_url: user.image_url || null,
+      is_active: !(user.banned || user.locked),
+      last_sign_in_at: lastSignInAt
     }
+
+    console.log('User data to sync:', userData)
 
     if (eventType === 'user.created') {
       // Create new user
@@ -65,6 +93,7 @@ export async function syncUserToSupabase({ user, eventType }: SyncUserOptions) {
         .insert(userData)
 
       if (error) throw error
+      console.log(`User ${user.id} created successfully`)
     } else if (eventType === 'user.updated') {
       // Update existing user
       const { error } = await supabase
@@ -72,6 +101,7 @@ export async function syncUserToSupabase({ user, eventType }: SyncUserOptions) {
         .upsert(userData, { onConflict: 'clerk_user_id' })
 
       if (error) throw error
+      console.log(`User ${user.id} updated successfully`)
     }
 
     return { success: true }
@@ -133,43 +163,72 @@ export async function syncMembershipToSupabase({ membership, eventType }: SyncMe
   const supabase = createSupabaseAdminClient()
 
   try {
+    console.log(`Syncing membership ${eventType}:`, membership)
+
     if (eventType === 'organizationMembership.deleted') {
+      // Get the user and organization IDs from Supabase first
+      const { data: user } = await supabase
+        .from('users')
+        .select('id')
+        .eq('clerk_user_id', membership.userId)
+        .single()
+
+      const { data: organization } = await supabase
+        .from('organizations')
+        .select('id')
+        .eq('clerk_org_id', membership.organizationId)
+        .single()
+
+      if (!user || !organization) {
+        console.warn('User or organization not found for membership deletion')
+        return { success: true } // Don't fail if records don't exist
+      }
+
       // Mark membership as inactive instead of deleting
       const { error } = await supabase
         .from('organization_memberships')
         .update({ is_active: false })
-        .eq('user_id', membership.userId)
-        .eq('organization_id', membership.organizationId)
+        .eq('user_id', user.id)
+        .eq('organization_id', organization.id)
 
       if (error) throw error
+      console.log(`Membership deactivated for user ${membership.userId} in org ${membership.organizationId}`)
       return { success: true }
     }
 
     // Get the user and organization IDs from Supabase
-    const { data: user } = await supabase
+    const { data: user, error: userError } = await supabase
       .from('users')
       .select('id')
       .eq('clerk_user_id', membership.userId)
       .single()
 
-    const { data: organization } = await supabase
+    if (userError || !user) {
+      throw new Error(`User with clerk_user_id ${membership.userId} not found in Supabase. Error: ${userError?.message}`)
+    }
+
+    const { data: organization, error: orgError } = await supabase
       .from('organizations')
       .select('id')
       .eq('clerk_org_id', membership.organizationId)
       .single()
 
-    if (!user || !organization) {
-      throw new Error('User or organization not found in Supabase')
+    if (orgError || !organization) {
+      throw new Error(`Organization with clerk_org_id ${membership.organizationId} not found in Supabase. Error: ${orgError?.message}`)
     }
+
+    console.log(`Found user ID: ${user.id}, org ID: ${organization.id}`)
 
     // Map Clerk role to our role enum
     const roleMapping: Record<string, 'admin' | 'manager' | 'member'> = {
       'admin': 'admin',
       'basic_member': 'member',
-      'member': 'member'
+      'member': 'member',
+      'manager': 'manager'
     }
 
     const role = roleMapping[membership.role] || 'member'
+    console.log(`Mapped role ${membership.role} to ${role}`)
 
     // Prepare membership data
     const membershipData = {
@@ -187,6 +246,7 @@ export async function syncMembershipToSupabase({ membership, eventType }: SyncMe
         .insert(membershipData)
 
       if (error) throw error
+      console.log(`Membership created for user ${membership.userId} in org ${membership.organizationId}`)
     } else if (eventType === 'organizationMembership.updated') {
       // Update existing membership
       const { error } = await supabase
@@ -196,6 +256,7 @@ export async function syncMembershipToSupabase({ membership, eventType }: SyncMe
         .eq('organization_id', organization.id)
 
       if (error) throw error
+      console.log(`Membership updated for user ${membership.userId} in org ${membership.organizationId}`)
     }
 
     return { success: true }

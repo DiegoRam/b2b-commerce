@@ -2,6 +2,7 @@
 
 import { useUser } from '@clerk/nextjs'
 import { useSubdomain } from '@/components/providers/SubdomainProvider'
+import { OrganizationSwitcher } from '@/components/OrganizationSwitcher'
 import { Package, ShoppingCart, Users, TrendingUp } from 'lucide-react'
 
 // Force dynamic rendering for this page since it uses auth
@@ -32,16 +33,19 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
       {/* Welcome Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">
-          Welcome back, {clerkUser?.firstName || 'User'}!
-        </h1>
-        <p className="text-gray-600 mt-2">
-          Organization: {currentOrganization.name}
-        </p>
-        <p className="text-sm text-gray-500">
-          Role: {userRole.charAt(0).toUpperCase() + userRole.slice(1)}
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">
+            Welcome back, {clerkUser?.firstName || 'User'}!
+          </h1>
+          <p className="text-gray-600 mt-2">
+            Organization: {currentOrganization.name}
+          </p>
+          <p className="text-sm text-gray-500">
+            Role: {userRole.charAt(0).toUpperCase() + userRole.slice(1)}
+          </p>
+        </div>
+        <OrganizationSwitcher />
       </div>
 
       {/* Stats Cards */}

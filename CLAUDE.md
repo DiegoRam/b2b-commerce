@@ -178,19 +178,34 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 ## Security & Permissions
 
-### Row Level Security (RLS)
-- All database operations are filtered by organization membership
-- Users can only access data from organizations they belong to
-- Subdomain validation ensures proper organization context
-- RLS policies check organization membership through `organization_memberships` table
+### ⚠️ CURRENT POC SECURITY STATUS
+**WARNING**: For rapid POC development and subdomain testing, security measures have been temporarily relaxed:
 
-### Subdomain Security
+- **RLS DISABLED**: Row Level Security policies are currently disabled on all tables
+- **PUBLIC ACCESS**: Database tables are publicly accessible via anon key
+- **NO AUTH ENFORCEMENT**: API routes may bypass proper authentication checks
+- **SECURITY RISK**: All organization data is currently accessible without proper access control
+
+**PRODUCTION REQUIREMENTS**: Before production deployment, the following must be implemented:
+1. **Enable RLS policies** with proper Clerk-Supabase JWT integration
+2. **Implement proper authentication** in all API routes
+3. **Add input validation** and sanitization
+4. **Configure secure subdomain routing** with access control
+5. **Audit all data access patterns** for organization isolation
+
+### Row Level Security (RLS) - DISABLED FOR POC
+- All database operations should be filtered by organization membership
+- Users should only access data from organizations they belong to
+- Subdomain validation should ensure proper organization context
+- RLS policies should check organization membership through `organization_memberships` table
+
+### Subdomain Security - BASIC IMPLEMENTATION
 - Middleware validates subdomain access for authenticated users
 - Cross-organization data access prevention through subdomain routing
 - Organization context validation on every API request
 
-### Input Validation
-- Form validation for all user inputs
+### Input Validation - MINIMAL
+- Basic form validation for user inputs
 - API endpoint protection with authentication and organization context checks
 - Sanitization of user-generated content
 
@@ -239,21 +254,24 @@ Add these lines to `/etc/hosts` (macOS/Linux) or `C:\Windows\System32\drivers\et
 ```
 
 #### Step 3: Database Setup
-Run the complete SQL schema in your Supabase SQL editor (see README.md for full schema).
+Run the fresh multi-organization schema script:
+1. Copy contents of `fresh_multi_org_schema.sql`
+2. Execute in Supabase SQL editor
+3. This creates complete schema with sample data for testing
 
 #### Step 4: Clerk Organization Setup
 1. Go to Clerk Dashboard → Organizations
-2. Create test organizations:
+2. Create test organizations matching the sample data:
    - **Educabot Organization** with slug: `educabot`
    - **Minimal Art Organization** with slug: `minimalart`
    - **Test Organization** with slug: `testorg`
+3. Update `organizations` table with actual Clerk org IDs (see README.md)
 
 #### Step 5: Add Test Users
-1. Create a test user account
-2. Add the user to multiple organizations with different roles:
-   - `educabot` - Admin role
-   - `minimalart` - Manager role
-   - `testorg` - Member role
+The fresh schema includes sample users and memberships. To test with real users:
+1. Create a test user account in Clerk
+2. Add the user to multiple organizations with different roles
+3. The sample data provides a multi-org user for immediate testing
 
 ### Testing Workflow
 
