@@ -208,11 +208,17 @@ export function useOrganization(): OrganizationContext {
     if (typeof window === 'undefined') return
 
     const currentHost = window.location.hostname
+    const currentPort = window.location.port
     let newHost = ''
 
     if (currentHost.includes('localhost')) {
       // For local development
-      newHost = `${organizationSubdomain}.localhost:${window.location.port || '3000'}`
+      newHost = `${organizationSubdomain}.localhost`
+      
+      // Only add port if it's not standard port 80 and port exists
+      if (currentPort && currentPort !== '80') {
+        newHost += `:${currentPort}`
+      }
     } else {
       // For production - replace subdomain
       const parts = currentHost.split('.')
