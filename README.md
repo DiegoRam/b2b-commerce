@@ -1,12 +1,12 @@
 # B2B E-commerce Platform
 
-A multi-tenant B2B e-commerce platform built with Next.js, Clerk authentication, and Supabase database. Features organization-based access control, automated user management, and a comprehensive product/order management system.
+A multi-tenant B2B e-commerce platform built with Next.js, Clerk authentication, and Convex database (migrating from Supabase). Features organization-based access control, automated user management, and a comprehensive product/order management system.
 
 ## 🚀 Features
 
 - **Multi-tenant Architecture**: Organization-based data isolation with automatic domain assignment
 - **Authentication**: Secure authentication with Clerk, including sign-in/sign-up flows
-- **User Management**: Automatic user sync between Clerk and Supabase with role-based access control
+- **User Management**: Automatic user sync between Clerk and the database (currently migrating from Supabase to Convex) with role-based access control
 - **Dashboard**: Professional B2B interface with navigation and user management
 - **Real-time Sync**: Webhook-based synchronization between authentication and database
 - **Type Safety**: Full TypeScript support with comprehensive type definitions
@@ -17,7 +17,7 @@ A multi-tenant B2B e-commerce platform built with Next.js, Clerk authentication,
 - **Framework**: [Next.js 15](https://nextjs.org/) with App Router
 - **Language**: [TypeScript](https://www.typescriptlang.org/)
 - **Authentication**: [Clerk](https://clerk.com/)
-- **Database**: [Supabase](https://supabase.com/) (PostgreSQL)
+- **Database**: [Convex](https://www.convex.dev) (migrating from Supabase)
 - **Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
 - **Icons**: [Lucide React](https://lucide.dev/)
 - **Fonts**: Geist Sans and Geist Mono
@@ -28,7 +28,7 @@ Before running this project, make sure you have:
 
 - Node.js 18+ installed
 - A Clerk account and application set up
-- A Supabase project with database configured
+- A Convex project set up (sign up at convex.dev)
 - npm or yarn package manager
 
 ## 🔧 Installation
@@ -56,7 +56,9 @@ Before running this project, make sure you have:
    NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/dashboard
    CLERK_WEBHOOK_SECRET=whsec_your_webhook_secret
 
-   # Supabase Configuration
+   # Convex Configuration
+CONVEX_URL=https://your-convex-url
+CONVEX_DEPLOYMENT=your-deployment
    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
    SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
@@ -141,13 +143,20 @@ WHERE subdomain = 'minimalart';
 
 ### Standard Development
 
-1. **Start the development server**:
+
+1. **Start the Convex dev server**:
+   ```bash
+   npm run convex
+   ```
+
+2. **Start the Next.js dev server**:
    ```bash
    npm run dev
    ```
 
-2. **Open your browser**:
+3. **Open your browser**:
    Navigate to [http://localhost:3000](http://localhost:3000)
+
 
 ### 🌐 Subdomain Testing Setup
 
