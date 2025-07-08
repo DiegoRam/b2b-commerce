@@ -23,6 +23,7 @@ Install additional required packages:
 npm install @clerk/nextjs @supabase/supabase-js @supabase/ssr lucide-react
 npm install class-variance-authority clsx tailwind-merge
 npm install @radix-ui/react-dropdown-menu @radix-ui/react-select
+npm install @medusajs/js-sdk
 ```
 
 ## Architecture
@@ -75,6 +76,7 @@ Subdomain multi-tenancy schema supporting users with multiple organization membe
 - **Styling**: Tailwind CSS v4
 - **Authentication**: Clerk with multi-organization support (@clerk/nextjs)
 - **Database**: Supabase with SSR support (@supabase/ssr, @supabase/supabase-js)
+- **E-commerce Backend**: MedusaJS with Docker integration (@medusajs/js-sdk)
 - **UI Components**: Radix UI (@radix-ui/react-dropdown-menu, @radix-ui/react-select)
 - **Utilities**: class-variance-authority, clsx, tailwind-merge
 - **Icons**: Lucide React
@@ -87,6 +89,7 @@ Subdomain multi-tenancy schema supporting users with multiple organization membe
 - `src/app/layout.tsx` - Root layout with ClerkProvider and SubdomainProvider
 - `lib/supabase.ts` - Supabase client configurations (browser + admin)
 - `lib/syncUser.ts` - Clerk to Supabase user/organization sync logic
+- `lib/medusa-client.ts` - MedusaJS client configuration and product sync utilities
 - `hooks/useOrganization.ts` - Organization context hook for subdomain handling
 
 #### Authentication Pages
@@ -145,6 +148,13 @@ NEXT_PUBLIC_APP_DOMAIN=localhost:3000
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
+### MedusaJS Configuration
+```env
+MEDUSA_BACKEND_URL=http://localhost:9000
+MEDUSA_ADMIN_EMAIL=admin@example.com
+MEDUSA_ADMIN_PASSWORD=supersecret
+```
+
 ## Key Features
 
 ### Subdomain-Based Multi-Tenancy
@@ -175,6 +185,14 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 - **Product Management**: Organization-specific CRUD operations, stock tracking
 - **Order Management**: Multi-item orders, status workflow, organization-scoped history
 - **User Management**: Organization membership management, role-based access control
+
+### MedusaJS E-commerce Integration
+- **Docker-based MedusaJS Backend**: Separate e-commerce backend running in Docker container
+- **Product Synchronization**: Two-way sync between Supabase and MedusaJS for product data
+- **Multi-tenant Support**: Organization-scoped product management with MedusaJS integration
+- **E-commerce Features**: Advanced product variants, pricing, inventory management via MedusaJS
+- **API Integration**: MedusaJS Admin API for product CRUD operations with proper authentication
+- **Development Setup**: Docker Compose configuration for local MedusaJS development
 
 ## Security & Permissions
 
@@ -277,6 +295,10 @@ The fresh schema includes sample users and memberships. To test with real users:
 
 #### Start Development Server
 ```bash
+# Start MedusaJS backend (optional - for e-commerce features)
+docker-compose up -d
+
+# Start Next.js development server
 npm run dev
 ```
 
@@ -352,3 +374,8 @@ npm run dev
 5. Sample business data (products, orders) filtered by organization
 6. Organization switcher for multi-organization users
 7. Working demo with test subdomains (educabot/minimalart)
+
+## Development Notes
+
+### Client Guidelines
+- **Do not try to start node server, I have one running already** - This ensures that you do not interfere with the existing development server

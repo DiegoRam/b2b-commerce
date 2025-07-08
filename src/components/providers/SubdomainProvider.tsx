@@ -36,9 +36,21 @@ export function SubdomainProvider({ children }: SubdomainProviderProps) {
     )
   }
 
+  // Debug logging for authentication state
+  console.log('SubdomainProvider Auth State:', {
+    isSignedIn,
+    userId,
+    isLoaded,
+    subdomainValid: organizationData.subdomainInfo.isValid,
+    subdomain: organizationData.subdomainInfo.subdomain,
+    userMemberships: organizationData.userMemberships.length,
+    hasAccess: organizationData.hasAccess
+  })
+
   // Handle organization access validation for signed-in users
   // Only proceed if user is truly signed in, has userId, and auth is fully loaded
-  if (isSignedIn && userId && isLoaded && organizationData.subdomainInfo.isValid) {
+  // Additional check: if we have no user memberships, don't show org-specific screens
+  if (isSignedIn && userId && isLoaded && organizationData.subdomainInfo.isValid && organizationData.userMemberships.length > 0) {
     // Show loading while organization data is being fetched
     if (organizationData.isLoading) {
       return (

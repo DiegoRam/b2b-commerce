@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { createSupabaseServerClient } from '@/lib/supabase'
+import { MedusaProductService } from '@/lib/medusa-client'
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = await auth()
@@ -13,7 +14,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const productId = params.id
+    const { id: productId } = await params
     const body = await request.json()
     const { name, description, price, sku, stock_quantity } = body
 
@@ -69,52 +70,14 @@ export async function PUT(
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
-    // Verify product belongs to this organization
-    const { data: existingProduct } = await supabase
-      .from('products')
-      .select('id')
-      .eq('id', productId)
-      .eq('organization_id', organization.id)
-      .single()
-
-    if (!existingProduct) {
-      return NextResponse.json({ error: 'Product not found' }, { status: 404 })
-    }
-
-    // Update product
-    const { data: product, error } = await supabase
-      .from('products')
-      .update({
-        name,
-        description: description || null,
-        price: parseFloat(price),
-        sku: sku || null,
-        stock_quantity: parseInt(stock_quantity) || 0,
-      })
-      .eq('id', productId)
-      .select(`
-        id,
-        name,
-        description,
-        price,
-        sku,
-        stock_quantity,
-        is_active,
-        created_at,
-        updated_at,
-        created_by,
-        creator:users!products_created_by_fkey (
-          first_name,
-          last_name,
-          email
-        )
-      `)
-      .single()
-
-    if (error) {
-      console.error('Error updating product:', error)
-      return NextResponse.json({ error: 'Failed to update product' }, { status: 500 })
-    }
+    // Update product in MedusaJS - no organization check needed since catalog is shared
+    const product = await MedusaProductService.updateProduct(productId, {
+      name,
+      description: description || undefined,
+      price: parseFloat(price),
+      sku: sku || undefined,
+      stock_quantity: parseInt(stock_quantity) || 0
+    })
 
     return NextResponse.json({ product })
   } catch (error) {
@@ -125,7 +88,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = await auth()
@@ -134,7 +97,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const productId = params.id
+    const { id: productId } = await params
     const supabase = await createSupabaseServerClient()
     
     // Get organization ID from subdomain
@@ -182,28 +145,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
-    // Verify product belongs to this organization
-    const { data: existingProduct } = await supabase
-      .from('products')
-      .select('id')
-      .eq('id', productId)
-      .eq('organization_id', organization.id)
-      .single()
-
-    if (!existingProduct) {
-      return NextResponse.json({ error: 'Product not found' }, { status: 404 })
-    }
-
-    // Soft delete product (mark as inactive)
-    const { error } = await supabase
-      .from('products')
-      .update({ is_active: false })
-      .eq('id', productId)
-
-    if (error) {
-      console.error('Error deleting product:', error)
-      return NextResponse.json({ error: 'Failed to delete product' }, { status: 500 })
-    }
+    // Delete product in MedusaJS - no organization check needed since catalog is shared
+    await MedusaProductService.deleteProduct(productId)
 
     return NextResponse.json({ message: 'Product deleted successfully' })
   } catch (error) {

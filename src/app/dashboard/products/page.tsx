@@ -190,7 +190,7 @@ export default function ProductsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Products</h1>
-          <p className="text-gray-600">Manage your organization's product catalog</p>
+          <p className="text-gray-600">Browse and manage the shared product catalog</p>
         </div>
         {canManageProducts && (
           <button

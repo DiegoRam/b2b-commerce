@@ -12,7 +12,7 @@ import type {
 } from '@/types'
 
 export function useOrganization(): OrganizationContext {
-  const { userId, isLoaded } = useAuth()
+  const { userId, isLoaded, isSignedIn } = useAuth()
   const [currentOrganization, setCurrentOrganization] = useState<Organization | null>(null)
   const [userMemberships, setUserMemberships] = useState<OrganizationMembership[]>([])
   const [userRole, setUserRole] = useState<UserRole | null>(null)
@@ -22,6 +22,22 @@ export function useOrganization(): OrganizationContext {
     isValid: false,
     organization: null
   })
+
+  // Force clear state when authentication is invalid (additional safety net)
+  useEffect(() => {
+    if (isLoaded && !isSignedIn && !userId) {
+      console.log('Force clearing state - user definitely not signed in')
+      setCurrentOrganization(null)
+      setUserMemberships([])
+      setUserRole(null)
+      setIsLoading(false)
+      setSubdomainInfo({
+        subdomain: '',
+        isValid: false,
+        organization: null
+      })
+    }
+  }, [isLoaded, isSignedIn, userId])
 
   // Get subdomain from current hostname
   const getSubdomainInfo = (): SubdomainInfo => {
@@ -50,13 +66,17 @@ export function useOrganization(): OrganizationContext {
     }
   }
 
-  // Clear state when user logs out
+  // Clear state when user logs out or session is invalid
   useEffect(() => {
+    console.log('useOrganization Auth Check:', { isLoaded, userId })
+    
     if (!isLoaded) return
     
-    // If user is not authenticated (logged out), clear all state
+    // If user is not authenticated (logged out), clear all state and browser storage
     if (!userId) {
-      console.log('User logged out, clearing organization state')
+      console.log('User logged out, clearing organization state and browser storage')
+      
+      // Clear our app state
       setCurrentOrganization(null)
       setUserMemberships([])
       setUserRole(null)
@@ -66,6 +86,24 @@ export function useOrganization(): OrganizationContext {
         isValid: false,
         organization: null
       })
+      
+      // Force clear browser storage that might be holding session data
+      if (typeof window !== 'undefined') {
+        console.log('Clearing browser storage')
+        try {
+          localStorage.clear()
+          sessionStorage.clear()
+          // Clear specific Clerk keys if they exist
+          Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('clerk') || key.startsWith('__clerk')) {
+              localStorage.removeItem(key)
+            }
+          })
+        } catch (error) {
+          console.error('Error clearing storage:', error)
+        }
+      }
+      
       return
     }
   }, [isLoaded, userId])
@@ -148,7 +186,7 @@ export function useOrganization(): OrganizationContext {
     }
 
     // Fetch organization data based on subdomain
-    const fetchOrganizationData = async (subdomain: string, memberships: any[]) => {
+    const fetchOrganizationData = async (subdomain: string, memberships: OrganizationMembership[]) => {
       if (!subdomain) return
 
       const supabase = createSupabaseBrowserClient()

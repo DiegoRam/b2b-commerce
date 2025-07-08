@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { createSupabaseServerClient } from '@/lib/supabase'
+import { MedusaProductService } from '@/lib/medusa-client'
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
     const host = request.headers.get('host') || url.host
     const subdomain = host.split('.')[0]
     
-    // If no subdomain (localhost), return error - products should be organization-specific
+    // If no subdomain (localhost), return error - still need organization context for access control
     if (subdomain === 'localhost' || subdomain === host) {
       return NextResponse.json({ error: 'Organization context required' }, { status: 400 })
     }
@@ -52,34 +53,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 })
     }
 
-    // Fetch products for this organization (RLS will handle filtering)
-    const { data: products, error } = await supabase
-      .from('products')
-      .select(`
-        id,
-        name,
-        description,
-        price,
-        sku,
-        stock_quantity,
-        is_active,
-        created_at,
-        updated_at,
-        created_by,
-        creator:users!products_created_by_fkey (
-          first_name,
-          last_name,
-          email
-        )
-      `)
-      .eq('organization_id', organization.id)
-      .eq('is_active', true)
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      console.error('Error fetching products:', error)
-      return NextResponse.json({ error: 'Failed to fetch products' }, { status: 500 })
-    }
+    // Fetch products from MedusaJS - shared catalog for all organizations
+    const products = await MedusaProductService.getProducts()
 
     return NextResponse.json({ products })
   } catch (error) {
@@ -151,42 +126,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
-    // Create product
-    const { data: product, error } = await supabase
-      .from('products')
-      .insert({
-        organization_id: organization.id,
-        name,
-        description: description || null,
-        price: parseFloat(price),
-        sku: sku || null,
-        stock_quantity: parseInt(stock_quantity) || 0,
-        created_by: user.id,
-        is_active: true
-      })
-      .select(`
-        id,
-        name,
-        description,
-        price,
-        sku,
-        stock_quantity,
-        is_active,
-        created_at,
-        updated_at,
-        created_by,
-        creator:users!products_created_by_fkey (
-          first_name,
-          last_name,
-          email
-        )
-      `)
-      .single()
-
-    if (error) {
-      console.error('Error creating product:', error)
-      return NextResponse.json({ error: 'Failed to create product' }, { status: 500 })
-    }
+    // Create product in MedusaJS
+    const product = await MedusaProductService.createProduct({
+      name,
+      description: description || undefined,
+      price: parseFloat(price),
+      sku: sku || undefined,
+      stock_quantity: parseInt(stock_quantity) || 0
+    })
 
     return NextResponse.json({ product }, { status: 201 })
   } catch (error) {

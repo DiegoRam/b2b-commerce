@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useSubdomain } from '@/components/providers/SubdomainProvider'
 import { Building2 } from 'lucide-react'
+import Link from 'next/link'
 
 export default function Home() {
   const { isSignedIn, isLoaded } = useAuth()
@@ -75,13 +76,13 @@ export default function Home() {
         <div className="text-center max-w-md mx-auto p-6">
           <Building2 className="h-16 w-16 text-blue-600 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-4">B2B E-commerce Platform</h1>
-          <p className="text-gray-600 mb-6">Sign in to access your organization's dashboard</p>
-          <a
+          <p className="text-gray-600 mb-6">Sign in to access your organization&apos;s dashboard</p>
+          <Link
             href="/sign-in"
             className="inline-block px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
           >
             Sign In
-          </a>
+          </Link>
         </div>
       </div>
     )
@@ -97,7 +98,7 @@ export default function Home() {
           </div>
           <h1 className="text-xl font-semibold text-gray-900 mb-2">No Organizations Found</h1>
           <p className="text-gray-600 mb-4">
-            You don't belong to any organizations yet. Contact your administrator to get access.
+            You don&apos;t belong to any organizations yet. Contact your administrator to get access.
           </p>
         </div>
       </div>

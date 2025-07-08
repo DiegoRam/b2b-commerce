@@ -7,7 +7,27 @@ export type OrganizationMembership = Database['public']['Tables']['organization_
   organization?: Organization
   user?: User
 }
-export type Product = Database['public']['Tables']['products']['Row']
+// MedusaJS-compatible Product type (replaces Supabase Product)
+export type Product = {
+  id: string
+  name: string
+  description: string | null
+  price: number
+  sku: string | null
+  stock_quantity: number
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  creator: {
+    first_name: string | null
+    last_name: string | null
+    email: string
+  } | null
+}
+
+// Keep the old database type for potential migration needs
+export type SupabaseProduct = Database['public']['Tables']['products']['Row']
 export type Order = Database['public']['Tables']['orders']['Row']
 export type OrderItem = Database['public']['Tables']['order_items']['Row']
 
