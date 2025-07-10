@@ -410,6 +410,10 @@ npm run dev
 - [x] **NEW**: Client detail API with sync status
 - [x] **NEW**: Client sync API for MedusaJS integration
 - [x] **NEW**: Carts API (GET, POST) with client context
+- [x] **NEW**: Cart management API (GET, PUT, DELETE) with MedusaJS sync
+- [x] **NEW**: Cart items API (POST) for adding products to carts
+- [x] **NEW**: Cart item management API (PUT, DELETE) for item updates
+- [x] **NEW**: Cart checkout API (POST, GET) for order conversion
 - [x] Clerk webhook for user/organization sync
 
 #### MedusaJS Integration
@@ -419,6 +423,11 @@ npm run dev
 - [x] **NEW**: Automatic client sync on create/update/delete
 - [x] **NEW**: B2B metadata mapping (tax_id, payment_terms, etc.)
 - [x] **NEW**: Manual sync endpoint with conflict detection
+- [x] **NEW**: MedusaCartService for cart synchronization
+- [x] **NEW**: Cart creation with MedusaJS integration
+- [x] **NEW**: Cart items management with real-time sync
+- [x] **NEW**: Cart checkout with order conversion
+- [x] **NEW**: Inventory validation and stock management
 
 #### UI Components and Pages
 - [x] Dashboard with organization-specific data
@@ -429,18 +438,11 @@ npm run dev
 
 ### 🔄 **IN PROGRESS**
 
-#### Cart Operations Integration
-- [x] Basic cart creation and listing
-- [ ] Cart items management (add, update, remove)
-- [ ] Cart-to-MedusaJS cart synchronization
-- [ ] Cart checkout API endpoint
-- [ ] Inventory validation with MedusaJS
-
 #### Advanced MedusaJS Features
 - [x] Customer management and sync
+- [x] Cart session management
+- [x] Order conversion from carts
 - [ ] Address synchronization (deferred - API structure clarification needed)
-- [ ] Cart session management
-- [ ] Order conversion from carts
 - [ ] Payment processing integration
 
 ### 📋 **PENDING IMPLEMENTATION**

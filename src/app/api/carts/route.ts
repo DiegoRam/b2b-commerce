@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { createSupabaseServerClient } from '@/lib/supabase'
-import type { CartInsert } from '@/types'
+import { MedusaCartService } from '@/lib/medusa-cart-service'
+import type { CartInsert, Cart, Client } from '@/types'
 
 export async function GET(request: NextRequest) {
   try {
@@ -200,7 +201,7 @@ export async function POST(request: NextRequest) {
     // Verify client exists and belongs to organization
     const { data: client } = await supabase
       .from('clients')
-      .select('id, company_name, contact_name, contact_email')
+      .select('id, organization_id, medusa_customer_id, company_name, contact_name, contact_email, contact_phone')
       .eq('id', client_id)
       .eq('organization_id', organization.id)
       .eq('is_active', true)
@@ -332,7 +333,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create cart' }, { status: 500 })
     }
 
-    // TODO: Create corresponding MedusaJS cart when MedusaJS integration is extended
+    // Create corresponding MedusaJS cart (optional, continue if fails)
+    try {
+      const syncResult = await MedusaCartService.createCart(cart as unknown as Cart, client as unknown as Client, subdomain, {
+        syncItems: false // No items yet, will sync when items are added
+      })
+      
+      if (syncResult.success) {
+        console.log(`Created MedusaJS cart ${syncResult.medusaCartId} for Supabase cart ${cart.id}`)
+      } else {
+        console.warn(`Failed to create MedusaJS cart for ${cart.id}:`, syncResult.error)
+      }
+    } catch (medusaError) {
+      console.warn('MedusaJS cart creation failed (continuing with Supabase cart):', medusaError)
+    }
 
     return NextResponse.json({ cart }, { status: 201 })
   } catch (error) {
