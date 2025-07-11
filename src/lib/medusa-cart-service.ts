@@ -298,15 +298,27 @@ export class MedusaCartService {
 
       const variant = medusaProduct.variants[0] // Use first variant
 
-      // TODO: Add item to MedusaJS cart (API structure to be fixed)
-      console.log('Would add item to MedusaJS cart:', { 
-        cartId: medusaCartId, 
-        variantId: variant.id, 
-        quantity 
+      // Add item to MedusaJS cart using correct API
+      const { cart: updatedCart } = await medusaClient.store.cart.createLineItem(medusaCartId, {
+        variant_id: variant.id,
+        quantity
       })
 
-      // TODO: Update Supabase cart item with MedusaJS line item ID when API is fixed
-      console.log('Would update cart item with line item ID')
+      // Find the newly added line item
+      const addedItem = updatedCart.items?.find(item => item.variant_id === variant.id)
+      
+      if (addedItem) {
+        // Update Supabase cart item with MedusaJS line item ID
+        await supabase
+          .from('cart_items')
+          .update({ medusa_line_item_id: addedItem.id })
+          .eq('cart_id', cartId)
+          .eq('product_id', productId)
+        
+        console.log(`Added item to MedusaJS cart ${medusaCartId}, line item ID: ${addedItem.id}`)
+      }
+
+      console.log(`Successfully added item to MedusaJS cart ${medusaCartId}, variant: ${variant.id}, quantity: ${quantity}`)
 
       return {
         success: true,
@@ -332,11 +344,17 @@ export class MedusaCartService {
     quantity: number
   ): Promise<CartSyncResult> {
     try {
-      // TODO: Fix MedusaJS API call structure in next phase
+      // Update or remove item in MedusaJS cart using correct API
       if (quantity === 0) {
-        console.log('Would remove item from MedusaJS cart:', { medusaCartId, medusaLineItemId })
+        // Remove item from MedusaJS cart
+        await medusaClient.store.cart.deleteLineItem(medusaCartId, medusaLineItemId)
+        console.log(`Removed item ${medusaLineItemId} from MedusaJS cart ${medusaCartId}`)
       } else {
-        console.log('Would update item in MedusaJS cart:', { medusaCartId, medusaLineItemId, quantity })
+        // Update item quantity in MedusaJS cart
+        await medusaClient.store.cart.updateLineItem(medusaCartId, medusaLineItemId, {
+          quantity
+        })
+        console.log(`Updated item ${medusaLineItemId} in MedusaJS cart ${medusaCartId} to quantity ${quantity}`)
       }
 
       return {
@@ -362,8 +380,9 @@ export class MedusaCartService {
     medusaLineItemId: string
   ): Promise<CartSyncResult> {
     try {
-      // TODO: Fix MedusaJS API call structure in next phase
-      console.log('Would remove item from MedusaJS cart:', { medusaCartId, medusaLineItemId })
+      // Remove item from MedusaJS cart using correct API
+      await medusaClient.store.cart.deleteLineItem(medusaCartId, medusaLineItemId)
+      console.log(`Removed item ${medusaLineItemId} from MedusaJS cart ${medusaCartId}`)
 
       return {
         success: true,
@@ -397,22 +416,98 @@ export class MedusaCartService {
    * Complete cart checkout in MedusaJS
    */
   static async completeCheckout(
-    medusaCartId: string
-  ): Promise<CartSyncResult> {
+    medusaCartId: string,
+    shippingAddress?: MedusaAddress,
+    billingAddress?: MedusaAddress,
+    paymentMethod?: string
+  ): Promise<CartSyncResult & { orderId?: string }> {
     try {
-      // Note: In a real implementation, you would:
-      // 1. Set shipping address
-      // 2. Set billing address  
-      // 3. Add shipping methods
-      // 4. Complete payment
-      // 5. Complete the cart to create an order
-      
-      // For now, we'll just mark this as a placeholder
-      console.log('MedusaJS checkout completion will be implemented in next phase', { medusaCartId })
+      // Step 1: Set shipping address (if provided)
+      if (shippingAddress) {
+        await medusaClient.store.cart.update(medusaCartId, {
+          shipping_address: shippingAddress
+        })
+      }
 
-      return {
-        success: true,
-        medusaCartId
+      // Step 2: Set billing address (if provided, use shipping address if not provided)
+      const finalBillingAddress = billingAddress || shippingAddress
+      if (finalBillingAddress) {
+        await medusaClient.store.cart.update(medusaCartId, {
+          billing_address: finalBillingAddress
+        })
+      }
+
+      // Step 3: Get available shipping methods and add shipping method
+      try {
+        const { shipping_options } = await medusaClient.store.fulfillment.listCartOptions({
+          cart_id: medusaCartId
+        })
+        
+        if (shipping_options && shipping_options.length > 0) {
+          // Use first available shipping method
+          const shippingOption = shipping_options[0]
+          await medusaClient.store.cart.addShippingMethod(medusaCartId, {
+            option_id: shippingOption.id
+          })
+          console.log(`Added shipping method ${shippingOption.id} to cart ${medusaCartId}`)
+        }
+      } catch (shippingError) {
+        console.warn('Could not add shipping method:', shippingError)
+        // Continue without shipping method for B2B carts
+      }
+
+      // Step 4: Initialize payment sessions
+      try {
+        // Use direct API call for payment sessions as it's not in the SDK's cart methods
+        const baseUrl = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000"
+        const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ""
+        
+        const response = await fetch(`${baseUrl}/store/carts/${medusaCartId}/payment-sessions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-publishable-api-key': publishableKey
+          }
+        })
+        
+        if (response.ok) {
+          console.log(`Created payment sessions for cart ${medusaCartId}`)
+        } else {
+          throw new Error(`Payment sessions creation failed: ${response.status}`)
+        }
+      } catch (paymentError) {
+        console.warn('Could not create payment sessions:', paymentError)
+        // Continue - some B2B flows might not require payment sessions
+      }
+
+      // Step 5: Complete the cart to create an order
+      const result = await medusaClient.store.cart.complete(medusaCartId)
+      
+      if (result.type === "order" && result.order) {
+        console.log(`Successfully completed MedusaJS checkout for cart ${medusaCartId}, created order ${result.order.id}`)
+        console.log(`Payment method: ${paymentMethod || 'manual'}`)
+        
+        return {
+          success: true,
+          medusaCartId,
+          orderId: result.order.id
+        }
+      } else if (result.type === "cart" && result.error) {
+        console.error(`Failed to complete MedusaJS checkout for cart ${medusaCartId}:`, result.error)
+        
+        return {
+          success: false,
+          medusaCartId,
+          error: typeof result.error === 'string' ? result.error : result.error.message || 'Cart completion failed'
+        }
+      } else {
+        console.error(`Unexpected response type from MedusaJS cart completion:`, result)
+        
+        return {
+          success: false,
+          medusaCartId,
+          error: 'Unexpected response from MedusaJS'
+        }
       }
     } catch (error) {
       console.error('Error completing checkout in MedusaJS:', error)

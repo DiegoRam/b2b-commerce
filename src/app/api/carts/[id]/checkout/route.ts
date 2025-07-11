@@ -25,10 +25,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const body = await request.json()
     const { 
-      // billing_address, 
-      // shipping_address, 
-      // notes,
-      // payment_method = 'pending' // For B2B, payment might be processed later
+      billing_address, 
+      shipping_address, 
+      payment_method = 'manual' // For B2B, use manual payment method
     } = body
 
     const supabase = await createSupabaseServerClient()
@@ -264,6 +263,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           customer_email,
           total_amount,
           status,
+          medusa_order_id,
           created_at,
           updated_at,
           created_by,
@@ -305,10 +305,52 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       // Complete MedusaJS checkout (optional, continue if fails)
       if (cart.medusa_cart_id) {
         try {
-          const syncResult = await MedusaCartService.completeCheckout(cart.medusa_cart_id)
+          // Create address from client data for MedusaJS
+          const clientData = (cart.client as unknown[])?.[0] as { 
+            company_name?: string
+            contact_name?: string
+            contact_email?: string
+            contact_phone?: string
+          }
+          
+          // Use provided addresses or create default from client data
+          const defaultAddress = {
+            company: clientData?.company_name || '',
+            first_name: clientData?.contact_name?.split(' ')[0] || '',
+            last_name: clientData?.contact_name?.split(' ').slice(1).join(' ') || '',
+            address_1: 'Default Address', // In production, collect from client
+            city: 'Default City',
+            country_code: 'us',
+            postal_code: '00000',
+            phone: clientData?.contact_phone || ''
+          }
+          
+          const medusaShippingAddress = shipping_address || defaultAddress
+          const medusaBillingAddress = billing_address || medusaShippingAddress
+          
+          const syncResult = await MedusaCartService.completeCheckout(
+            cart.medusa_cart_id,
+            medusaShippingAddress,
+            medusaBillingAddress,
+            payment_method
+          )
           
           if (syncResult.success) {
             console.log(`Completed MedusaJS checkout for cart ${cart.medusa_cart_id}`)
+            if (syncResult.orderId) {
+              console.log(`Created MedusaJS order: ${syncResult.orderId}`)
+              // Store MedusaJS order ID in Supabase order record
+              const { error: updateError } = await supabase
+                .from('orders')
+                .update({ medusa_order_id: syncResult.orderId })
+                .eq('id', order.id)
+              
+              if (updateError) {
+                console.error('Failed to update order with MedusaJS order ID:', updateError)
+              } else {
+                console.log(`Updated order ${order.id} with MedusaJS order ID: ${syncResult.orderId}`)
+              }
+            }
           } else {
             console.warn(`Failed to complete MedusaJS checkout:`, syncResult.error)
           }

@@ -186,13 +186,16 @@ MEDUSA_ADMIN_PASSWORD=supersecret
 - **Order Management**: Multi-item orders, status workflow, organization-scoped history
 - **User Management**: Organization membership management, role-based access control
 
-### MedusaJS E-commerce Integration
+### MedusaJS E-commerce Integration ✅ **COMPLETED**
 - **Docker-based MedusaJS Backend**: Separate e-commerce backend running in Docker container
-- **Product Synchronization**: Two-way sync between Supabase and MedusaJS for product data
+- **Real API Integration**: Actual MedusaJS v2 API calls for cart operations (createLineItem, updateLineItem, deleteLineItem)
+- **Cart-to-Order Flow**: Complete checkout process with shipping methods, payment sessions, and order creation
+- **Order Synchronization**: Real-time sync between Supabase and MedusaJS with medusa_order_id tracking
 - **Multi-tenant Support**: Organization-scoped product management with MedusaJS integration
 - **E-commerce Features**: Advanced product variants, pricing, inventory management via MedusaJS
 - **API Integration**: MedusaJS Admin API for product CRUD operations with proper authentication
 - **Development Setup**: Docker Compose configuration for local MedusaJS development
+- **Error Handling**: Proper fallback mechanisms for API failures and response type handling
 
 ### B2B Client and Cart System ✅ **IMPLEMENTED**
 - **Client Entity**: B2B customer management with company details, billing/shipping addresses
@@ -201,6 +204,19 @@ MEDUSA_ADMIN_PASSWORD=supersecret
 - **Organization Context**: All client and cart operations properly scoped to organizations
 - **Role-Based Access**: Admin/Manager can manage clients, all members can create carts
 - **Metadata Mapping**: B2B business fields (tax_id, payment_terms, credit_limit) stored in MedusaJS metadata
+
+### Real MedusaJS API Integration ✅ **COMPLETED**
+- **Cart Operations**: Actual API calls replacing mock implementations
+  - `addItemToCart()`: Uses `medusaClient.store.cart.createLineItem()`
+  - `updateCartItem()`: Uses `medusaClient.store.cart.updateLineItem()`
+  - `removeCartItem()`: Uses `medusaClient.store.cart.deleteLineItem()`
+- **Checkout Process**: Complete cart-to-order flow with real MedusaJS integration
+  - Address handling (shipping/billing)
+  - Shipping method selection
+  - Payment session creation
+  - Order completion with proper response handling
+- **Database Schema**: Added `medusa_order_id` column to orders table for synchronization
+- **Error Handling**: Proper fallback mechanisms for API failures and response type validation
 
 ## Security & Permissions
 

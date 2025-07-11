@@ -14,6 +14,11 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./init-scripts:/docker-entrypoint-initdb.d
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medusa_user -d medusa_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
@@ -21,6 +26,44 @@ services:
     ports:
       - "6379:6379"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  medusa:
+    build:
+      context: ./medusa
+      dockerfile: Dockerfile
+    container_name: medusa-backend
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgres://medusa_user:medusa_password@postgres:5432/medusa_db
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=supersecret
+      - COOKIE_SECRET=supersecret
+      - STORE_CORS=http://localhost:3000,https://educabot.localhost:3000,https://minimalart.localhost:3000
+      - ADMIN_CORS=http://localhost:3000,http://localhost:9000
+      - AUTH_CORS=http://localhost:3000,http://localhost:9000
+      - MEDUSA_ADMIN_API_KEY=sk_7da88dd627bc339c90a9637a7d2ec0103257a8123175faeb9bea7cd3497d5f3e
+      - MEDUSA_PUBLISHABLE_KEY=pk_29d18ebfd69310f5f50cc4645461d05e20da93af9b5fb24cb6254ec72f903862
+    ports:
+      - "9000:9000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./medusa:/app
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    command: ["npm", "run", "dev"]
 
 volumes:
   postgres_data:

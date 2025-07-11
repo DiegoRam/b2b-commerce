@@ -392,6 +392,7 @@ export type Database = {
           total_amount: number
           status: 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled'
           created_by: string | null
+          medusa_order_id: string | null
           created_at: string
           updated_at: string
         }
@@ -404,6 +405,7 @@ export type Database = {
           total_amount: number
           status?: 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled'
           created_by?: string | null
+          medusa_order_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -416,6 +418,7 @@ export type Database = {
           total_amount?: number
           status?: 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled'
           created_by?: string | null
+          medusa_order_id?: string | null
           created_at?: string
           updated_at?: string
         }
