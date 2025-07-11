@@ -1,16 +1,73 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { useUser } from '@clerk/nextjs'
 import { useSubdomain } from '@/components/providers/SubdomainProvider'
 import { OrganizationSwitcher } from '@/components/OrganizationSwitcher'
-import { Package, ShoppingCart, Users, TrendingUp } from 'lucide-react'
+import { Package, ShoppingCart, UserCheck, Calendar, DollarSign } from 'lucide-react'
+import Link from 'next/link'
 
 // Force dynamic rendering for this page since it uses auth
 export const dynamic = 'force-dynamic'
 
+interface DashboardStats {
+  products: number
+  orders: number
+  clients: number
+  carts: number
+  revenue: number
+}
+
 export default function DashboardPage() {
   const { user: clerkUser } = useUser()
   const { currentOrganization, userRole, isLoading } = useSubdomain()
+  const [stats, setStats] = useState<DashboardStats>({
+    products: 0,
+    orders: 0,
+    clients: 0,
+    carts: 0,
+    revenue: 0
+  })
+  const [statsLoading, setStatsLoading] = useState(true)
+
+  useEffect(() => {
+    if (currentOrganization) {
+      fetchDashboardStats()
+    }
+  }, [currentOrganization])
+
+  const fetchDashboardStats = async () => {
+    try {
+      setStatsLoading(true)
+      const [productsRes, ordersRes, clientsRes, cartsRes] = await Promise.all([
+        fetch('/api/products'),
+        fetch('/api/orders'),
+        fetch('/api/clients'),
+        fetch('/api/carts')
+      ])
+
+      const [productsData, ordersData, clientsData, cartsData] = await Promise.all([
+        productsRes.json(),
+        ordersRes.json(),
+        clientsRes.json(),
+        cartsRes.json()
+      ])
+
+      const revenue = ordersData.orders?.reduce((sum: number, order: { total_amount: number }) => sum + order.total_amount, 0) || 0
+
+      setStats({
+        products: productsData.products?.length || 0,
+        orders: ordersData.orders?.length || 0,
+        clients: clientsData.clients?.length || 0,
+        carts: cartsData.carts?.length || 0,
+        revenue
+      })
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error)
+    } finally {
+      setStatsLoading(false)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -49,43 +106,63 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center">
             <Package className="h-8 w-8 text-blue-600" />
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Total Products</p>
-              <p className="text-2xl font-bold text-gray-900">0</p>
+              <p className="text-sm font-medium text-gray-600">Products</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {statsLoading ? '...' : stats.products}
+              </p>
             </div>
           </div>
         </div>
 
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center">
-            <ShoppingCart className="h-8 w-8 text-green-600" />
+            <UserCheck className="h-8 w-8 text-green-600" />
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Total Orders</p>
-              <p className="text-2xl font-bold text-gray-900">0</p>
+              <p className="text-sm font-medium text-gray-600">Clients</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {statsLoading ? '...' : stats.clients}
+              </p>
             </div>
           </div>
         </div>
 
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center">
-            <Users className="h-8 w-8 text-purple-600" />
+            <ShoppingCart className="h-8 w-8 text-purple-600" />
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Team Members</p>
-              <p className="text-2xl font-bold text-gray-900">1</p>
+              <p className="text-sm font-medium text-gray-600">Active Carts</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {statsLoading ? '...' : stats.carts}
+              </p>
             </div>
           </div>
         </div>
 
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center">
-            <TrendingUp className="h-8 w-8 text-orange-600" />
+            <Calendar className="h-8 w-8 text-orange-600" />
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Orders</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {statsLoading ? '...' : stats.orders}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center">
+            <DollarSign className="h-8 w-8 text-emerald-600" />
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Revenue</p>
-              <p className="text-2xl font-bold text-gray-900">$0</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {statsLoading ? '...' : `$${stats.revenue.toFixed(2)}`}
+              </p>
             </div>
           </div>
         </div>
@@ -97,24 +174,30 @@ export default function DashboardPage() {
           <h2 className="text-lg font-semibold text-gray-900">Quick Actions</h2>
         </div>
         <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <button className="p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 transition-colors">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Link href="/dashboard/products" className="p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 transition-colors">
               <Package className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-              <p className="text-sm font-medium text-gray-900">Add Product</p>
-              <p className="text-xs text-gray-500">Add new products to your catalog</p>
-            </button>
+              <p className="text-sm font-medium text-gray-900">Manage Products</p>
+              <p className="text-xs text-gray-500">View and manage your product catalog</p>
+            </Link>
             
-            <button className="p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 transition-colors">
+            <Link href="/dashboard/clients" className="p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 transition-colors">
+              <UserCheck className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+              <p className="text-sm font-medium text-gray-900">Manage Clients</p>
+              <p className="text-xs text-gray-500">Add and manage B2B clients</p>
+            </Link>
+            
+            <Link href="/dashboard/carts" className="p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 transition-colors">
               <ShoppingCart className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-              <p className="text-sm font-medium text-gray-900">Create Order</p>
-              <p className="text-xs text-gray-500">Process a new customer order</p>
-            </button>
+              <p className="text-sm font-medium text-gray-900">Shopping Carts</p>
+              <p className="text-xs text-gray-500">Create and manage client carts</p>
+            </Link>
             
-            <button className="p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 transition-colors">
-              <Users className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-              <p className="text-sm font-medium text-gray-900">Invite User</p>
-              <p className="text-xs text-gray-500">Add team members to your organization</p>
-            </button>
+            <Link href="/dashboard/orders" className="p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 transition-colors">
+              <Calendar className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+              <p className="text-sm font-medium text-gray-900">View Orders</p>
+              <p className="text-xs text-gray-500">Track and manage customer orders</p>
+            </Link>
           </div>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { UserButton } from '@clerk/nextjs'
-import { Building2, Package, ShoppingCart, Users, Settings } from 'lucide-react'
+import { Building2, Package, ShoppingCart, Users, Settings, UserCheck, Receipt } from 'lucide-react'
 import Link from 'next/link'
 
 export default function DashboardLayout({
@@ -54,8 +54,26 @@ export default function DashboardLayout({
                   href="/dashboard/orders"
                   className="flex items-center space-x-3 px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-gray-900"
                 >
-                  <ShoppingCart className="h-5 w-5" />
+                  <Receipt className="h-5 w-5" />
                   <span>Orders</span>
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/dashboard/clients"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                >
+                  <UserCheck className="h-5 w-5" />
+                  <span>Clients</span>
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/dashboard/carts"
+                  className="flex items-center space-x-3 px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                >
+                  <ShoppingCart className="h-5 w-5" />
+                  <span>Carts</span>
                 </Link>
               </li>
               <li>
